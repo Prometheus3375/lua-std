@@ -1,4 +1,4 @@
-dofile('../Class.lua')
+dofile('Library/Class.lua')
 
 
 function test_class()
