@@ -2,8 +2,13 @@ dofile('../Common.lua')
 
 do
     local test = {}
+    local common = InitCommon()
+    local iter = common.iter
+    local enumerate = common.enumerate
 
     local t = {10, 11, 12, 13, 14, 15 , 16, 17, 18, 19}
+    t.__class = {}
+    t.__name = 'table name'
     
     local function helper(state, value)
         state.current = state.current + 1
