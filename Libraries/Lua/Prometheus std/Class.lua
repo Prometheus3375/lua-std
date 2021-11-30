@@ -1,15 +1,17 @@
 function InitClasses()
+    local Class = {}
+
     local function empty_func(...) end
     
-    local function set(array)
+    local function set(...)
         local s = {}
-        for i, v in ipairs(array) do
+        for i, v in ipairs({...}) do
             s[v] = true
         end
         return s
     end
 
-    local special_fields = set({
+    local special_fields = set(
         -- instance fields
         '__class',
         '__values',
@@ -30,7 +32,7 @@ function InitClasses()
         -- super fields
         '__ins',
         '__cls',
-    })
+    )
     
     local indexers = {
         '__public',
@@ -38,12 +40,30 @@ function InitClasses()
         '__properties',
     }
 
-    local function typeof(ins)
+    function Class.typeof(ins)
         return ins.__class
     end
     
-    local function nameof(cls)
+    function Class.nameof(cls)
         return cls.__name
+    end
+    
+    function Class.addressof(ins)
+        local meta = ins.__class.__meta
+        local str = meta.__tostring
+        local result
+        if str then
+            meta.__tostring = nil
+            result = tostring(ins)
+            meta.__tostring = str
+        else
+            result = tostring(ins)
+        end
+        
+        -- __name is forbidden, so it cannot be inside meta.
+        -- Thus, result is in format 'table: address'
+        
+        return string.sub(result, 8)
     end
     
     
@@ -94,7 +114,7 @@ function InitClasses()
     end
 
 
-    local function issubclass(cls, ...)
+    local function Class.issubclass(cls, ...)
         local supers = table.pack(...)
         
         for i = 1, supers.n do
@@ -106,7 +126,7 @@ function InitClasses()
         return false
     end
     
-    local function isinstance(ins, ...)
+    local function Class.isinstance(ins, ...)
         return issubclass(ins.__class, ...)
     end
     
@@ -121,7 +141,7 @@ function InitClasses()
         end,
     }
     
-    local function super(ins, parent)
+    local function Class.super(ins, parent)
         cls = ins.__class
         if parent then
             if not cls.__supers[parent] then
@@ -159,18 +179,18 @@ function InitClasses()
         end,
     }
     
-    local function field(public)
+    function Class.field(public)
         return {type = 'field', public = public}
     end
     
-    local function property(getter, setter)
+    function Class.property(getter, setter)
         if getter == nil and setter == nil then
             error('property must have either a getter or a setter or both', 2)
         end
         return {type = 'property', getter = getter, setter = setter}
     end
     
-    local function meta(value)
+    function Class.meta(value)
         if value == nil then
             error('meta must have a value', 2)
         end
@@ -261,26 +281,11 @@ function InitClasses()
     subclass = function (parent, name, deftable)
         return create_class(name, deftable, parent)
     end
-
-    local Class = {
-        typeof = typeof,
-        nameof = nameof,
-        
-        issubclass = issubclass,
-        isinstance = isinstance,
-        
-        super = super,
     
-        field = field,
-        property = property,
-        meta = meta,
-    }
-    
-    setmetatable(Class, {
+    -- todo: protect Class
+    return setmetatable(Class, {
         __call = function (self, name, deftable, parent)
             return create_class(name, deftable, parent)
         end
     })
-    
-    return Class
 end
