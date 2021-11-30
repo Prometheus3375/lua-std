@@ -3,15 +3,15 @@ function InitClasses()
 
     local function empty_func(...) end
     
-    local function set(...)
+    local function set(array)
         local s = {}
-        for i, v in ipairs({...}) do
+        for i, v in ipairs(array) do
             s[v] = true
         end
         return s
     end
 
-    local special_fields = set(
+    local special_fields = set({
         -- instance fields
         '__class',
         '__values',
@@ -32,7 +32,7 @@ function InitClasses()
         -- super fields
         '__ins',
         '__cls',
-    )
+    })
     
     local indexers = {
         '__public',
@@ -114,7 +114,7 @@ function InitClasses()
     end
 
 
-    local function Class.issubclass(cls, ...)
+    function Class.issubclass(cls, ...)
         local supers = table.pack(...)
         
         for i = 1, supers.n do
@@ -126,7 +126,7 @@ function InitClasses()
         return false
     end
     
-    local function Class.isinstance(ins, ...)
+    function Class.isinstance(ins, ...)
         return issubclass(ins.__class, ...)
     end
     
@@ -141,7 +141,7 @@ function InitClasses()
         end,
     }
     
-    local function Class.super(ins, parent)
+    function Class.super(ins, parent)
         cls = ins.__class
         if parent then
             if not cls.__supers[parent] then

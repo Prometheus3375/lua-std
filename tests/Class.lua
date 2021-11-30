@@ -8,7 +8,7 @@ function test_class()
         
     }
     function Animal:new(name)
-        local values = valuesof(self)
+        local values = self.__values
         values.name = name
         self.public_name = name
     end
@@ -31,7 +31,7 @@ function test_inheritance()
         
     }
     function Animal:new(name)
-        local values = valuesof(self)
+        local values = self.__values
         values.name = name
     end
     
