@@ -241,7 +241,8 @@ function InitClassPackage(common)
       local p = parents[i]
       if isclass(p) then
         if parent_class then
-          error('a class can have only one superclass')
+          error('a class can have only one superclass, another superclass is passed as '
+            .. number2index(i) .. ' ancestor', 3)
         else
           parent_class = p
         end
@@ -249,15 +250,13 @@ function InitClassPackage(common)
         table.insert(parent_interfaces, p)
       else
         error('all ancestors must be either classes or interfaces, '
-          .. number2index(i) .. ' passed ancestor is ' .. repr(p),
-          3
-        )
+          .. number2index(i) .. ' passed ancestor is ' .. repr(p), 3)
       end
     end
     --endregion
 
     for _, itf in ipairs(parent_interfaces) do
-      itf:PrepareClassDeftable(deftable, parent_class, 4)
+      itf:PrepareClassDeftable(deftable, parent_class, 3)
     end
 
     local class = {
@@ -338,6 +337,7 @@ function InitClassPackage(common)
   --endregion
 
   --region Interface variables
+  --region Methods
   local method_meta = gen_meta('interface methods', true)
   method_meta.__index = {}
 
@@ -375,14 +375,15 @@ function InitClassPackage(common)
       is_metamethod = is_metamethod or false,
     }, method_meta)
   end
+  --endregion
 
   local interface_meta = gen_meta('interfaces', true)
   function interface_meta.__tostring(self) return '<interface ' .. repr(self.__name) .. '>' end
   interface_meta.__index = {}
 
-  function interface_meta.__index:Register(cls, err_level)
+  function interface_meta.__index:Register(cls)
     if not isclass(cls) then
-      error('only classes can be registered, got ' .. repr(cls), err_level or 2)
+      error('only classes can be registered, got ' .. repr(cls), 2)
     end
 
     self.__registered[cls] = true
@@ -395,17 +396,13 @@ function InitClassPackage(common)
     return self.__registered[cls] or false
   end
 
-  function interface_meta.__index:IsDescendantOf(itf)
-    if rawequal(self, itf) then
-      return true
-    end
-
-    return self.__all_supers[itf] or false
+  function interface_meta.__index:IsAncestorOf(itf)
+    return rawequal(self, itf) or (isinterface(itf) and itf.__all_supers[self] or false)
   end
 
   function interface_meta.__index:PrepareClassDeftable(class_deftable, class_parent, err_level)
     class_parent = class_parent or {__meta = {}}
-    err_level = err_level or 2
+    err_level = (err_level or 1) + 1
 
     for _, m_table in ipairs(self.__simple_methods) do
       local m_name = m_table.name
@@ -588,7 +585,7 @@ function InitClassPackage(common)
 
     if isinterface(value) then
       for _, other in ipairs(interfaces) do
-        if value:IsDescendantOf(other) then
+        if other:IsAncestorOf(value) then
           return true
         end
       end
