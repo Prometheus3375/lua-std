@@ -108,7 +108,7 @@ function InitCommonBases(common, Interface)
 
   --region Common
   local function not_of_type(ins, typ, level)
-    error('instance of type ' .. ins.__class.__name .. ' is not ' .. typ, level)
+    error('instance of type ' .. ins.__class.__name .. ' is not ' .. typ, level + 1)
   end
 
   local common_ex = {}
@@ -117,36 +117,36 @@ function InitCommonBases(common, Interface)
   local Iterator = CB.Iterator
   local Reversible = CB.Reversible
 
-  function common_ex.contains(container, value)
+  function common_ex.contains(container, value, err_level)
     if isinstance(container, Container) then
       return container:__contains(value)
     end
 
-    not_of_type(container, 'a container', 3)
+    not_of_type(container, 'a container', (err_level or 1) + 1)
   end
 
-  function common_ex.iter(iterable)
+  function common_ex.iter(iterable, err_level)
     if isinstance(iterable, Iterable) then
       return iterable:__iter()
     end
 
-    not_of_type(iterable, 'an iterable', 3)
+    not_of_type(iterable, 'an iterable', (err_level or 1) + 1)
   end
 
-  function common_ex.inext(iterator)
+  function common_ex.inext(iterator, err_level)
     if isinstance(iterator, Iterator) then
       return iterator:__inext()
     end
 
-    not_of_type(iterator, 'an iterator', 3)
+    not_of_type(iterator, 'an iterator', (err_level or 1) + 1)
   end
 
-  function common_ex.reverse(reversible)
+  function common_ex.reverse(reversible, err_level)
     if isinstance(reversible, Reversible) then
       return reversible:__reverse()
     end
 
-    not_of_type(reversible, 'a reversible', 3)
+    not_of_type(reversible, 'a reversible', (err_level or 1) + 1)
   end
 
   for name, value in pairs(common_ex) do
