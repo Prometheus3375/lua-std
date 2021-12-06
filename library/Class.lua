@@ -1,7 +1,7 @@
-function InitClasses(common)
+function InitClassPackage(common)
+  --region Initialization
   common = common or _ENV.common or _ENV.Common
 
-  --region Initialization
   local __meta_weak_keys = {__mode = 'k'}
   local __meta_weak_values = {__mode = 'v'}
 
@@ -123,6 +123,24 @@ function InitClasses(common)
     return setmetatable({__ins = ins, __cls = parent}, super_meta)
   end
 
+  function Class.field(public)
+    return {type = 'field', public = public}
+  end
+
+  function Class.property(getter, setter)
+    if rawequal(getter, nil) and rawequal(setter, nil) then
+      error('property must have either a getter or a setter or both', 2)
+    end
+    return {type = 'property', getter = getter, setter = setter}
+  end
+
+  function Class.meta(value)
+    if rawequal(value, nil) then
+      error('meta must have a value', 2)
+    end
+    return {type = 'meta', value = value}
+  end
+
   local add_class_indexer = {
     field = function(cls, key, description)
       if description.public then
@@ -143,24 +161,6 @@ function InitClasses(common)
       cls.__meta[key] = description.value
     end,
   }
-
-  function Class.field(public)
-    return {type = 'field', public = public}
-  end
-
-  function Class.property(getter, setter)
-    if rawequal(getter, nil) and rawequal(setter, nil) then
-      error('property must have either a getter or a setter or both', 2)
-    end
-    return {type = 'property', getter = getter, setter = setter}
-  end
-
-  function Class.meta(value)
-    if rawequal(value, nil) then
-      error('meta must have a value', 2)
-    end
-    return {type = 'meta', value = value}
-  end
 
   local function class_tostring(cls)
     return '<class ' .. repr(cls.__name) .. '>'
