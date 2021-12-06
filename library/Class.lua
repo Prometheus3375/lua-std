@@ -229,6 +229,7 @@ function InitClasses(common)
   function Class.GetByName(name) return class_names[name] end
 
   local function create_class(name, deftable, ...)
+    --region Check arguments
     if class_names[name] then
       error('name ' .. repr(name) .. ' is already in use', 3)
     end
@@ -253,7 +254,11 @@ function InitClasses(common)
         )
       end
     end
+    --endregion
 
+    if parent_class then
+      setmetatable(deftable, {__index = parent_class})
+    end
     for _, itf in ipairs(parent_interfaces) do
       itf:PrepareClassDeftable(deftable)
     end
