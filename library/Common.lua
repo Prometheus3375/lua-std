@@ -61,14 +61,15 @@ function InitCommonPackage()
     return meta
   end
 
-  function common.expose_package(package, renames, exclude)
+  function common.expose_package(package, global, renames, exclude)
+    global = global or _ENV
     renames = renames or {}
     exclude = exclude or {}
     for name, field in pairs(package) do
       if renames[name] then
-        _ENV[renames[name]] = field
+        global[renames[name]] = field
       elseif not exclude[name] then
-        _ENV[name] = field
+        global[name] = field
       end
     end
   end
