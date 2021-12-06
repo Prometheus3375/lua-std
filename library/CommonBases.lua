@@ -5,6 +5,8 @@ function InitCommonBases(common, Interface)
 
   local CB = {}
 
+  local isclass = common.isclass
+  local isinterface = common.isinterface
   local isinstance = common.isinstance
   local def_method = Interface.DefineMethod
   --endregion
@@ -38,46 +40,69 @@ function InitCommonBases(common, Interface)
     CB.Iterable
   )
 
-  local function is_registered_or_check_methods(self, cls)
+  local itables = {'__simple_methods', '__meta_methods'}
+
+  local function has_registered_or_check_methods_and_register(self, cls)
+    if not isclass(cls) then
+      return false
+    end
+
     if self.__registered[cls] then
-      return 2
-    end
-
-    for _, m_table in ipairs(self.__methods) do
-      local m = m_table.is_metamethod and cls.__meta[m_table.name] or cls[m_table.name]
-      if type(m) ~= 'function' then
-        return 0
-      end
-    end
-
-    return 1
-  end
-
-  local function is_registered_or_check_methods_and_register(self, cls)
-    local registered = is_registered_or_check_methods(self, cls)
-    if registered == 2 then
       return true
     end
 
-    -- check methods of ancestors
-    for _, p in ipairs(self.__all_supers_array) do
-      registered = is_registered_or_check_methods(p, cls)
-      if registered == 0 then
+    --region Check whether cls has all methods of self
+    for _, m_table in ipairs(self.__simple_methods) do
+      if type(cls[m_table.name]) ~= 'function' then
         return false
       end
     end
 
-    -- Why not register for each parent in the loop above?
-    -- Because some interfaces have parent with no methods (OrderedCollection and Collection).
-    -- For them the result will be 1, but the result for their parent can be 0.
-    -- Thus, register for self and parents only when all parents are checked.
+    for _, m_table in ipairs(self.__meta_methods) do
+      if type(cls.__meta[m_table.name]) ~= 'function' then
+        return false
+      end
+    end
+    --endregion
+
     self:Register(cls)
 
     return true
   end
 
+  local function is_ancestor_of(self, itf)
+    if rawequal(self, itf) then
+      return true
+    end
+
+    if not isinterface(itf) then
+      return false
+    end
+
+    if itf.__all_supers[self] then
+      return true
+    end
+
+    -- Check whether itf has all methods of self
+    for _, field in ipairs(itables) do
+      local name2method = {}
+      for _, m_table in ipairs(itf[field]) do
+        name2method[m_table.name] = m_table
+      end
+
+      for _, m_table in ipairs(self[field]) do
+        if m_table ~= name2method[m_table.name] then
+          return false
+        end
+      end
+    end
+
+    return true
+  end
+
   for _, base in pairs(CB) do
-    rawset(base, 'IsRegistered', is_registered_or_check_methods_and_register)
+    rawset(base, 'IsAncestorOf', is_ancestor_of)
+    rawset(base, 'HasRegistered', has_registered_or_check_methods_and_register)
   end
   --endregion
 
