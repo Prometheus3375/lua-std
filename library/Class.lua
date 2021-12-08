@@ -383,10 +383,13 @@ function InitClassPackage(common)
 
   --region Interface variables
   --region Methods
+
+  -- todo add Signature object
+  -- signatures are equal when one of them have vararg. Otherwise, number of arguments must be equal
   local method_meta = gen_meta('interface methods', true)
   method_meta.__index = {}
 
-  function method_meta.__tostring(self)
+  function method_meta:__tostring()
     if self.is_metamethod then
       return 'interface metamethod ' .. self.name .. self.signature
     end
@@ -394,10 +397,10 @@ function InitClassPackage(common)
     return 'interface method ' .. self.name .. self.signature
   end
 
-  function method_meta.__eq(self, other)
-    return self.name == other.name
+  function method_meta:__eq(other)
+    return self.is_metamethod == other.is_metamethod
+      and self.name == other.name
       and self.signature == other.signature
-      and self.is_metamethod == other.is_metamethod
   end
 
   function method_meta.__index:WithDefault(default)
