@@ -19,6 +19,7 @@ function InitCommonBases(common, Interface)
     reverse = def_method('__reverse', '(self)'),
     len = def_method('__len', '(self)', true),
     call = def_method('__call', '(self, ...)', true),
+    array = def_method('__array', '(self)'),
   }
 
   CB.Container = Interface('Container', {method.contains})
@@ -28,16 +29,21 @@ function InitCommonBases(common, Interface)
   CB.Callable = Interface('Callable', {method.call})
   CB.Collection = Interface('Collection', {}, CB.Container, CB.Iterable, CB.Sized)
   CB.OrderedCollection = Interface('OrderedCollection', {}, CB.Collection, CB.Reversible)
+  CB.Array = Interface('Array', {method.array})
 
   local function iterator_iter(self) return self end
+  local function iterator_call(self) return self:__inext() end
 
+  -- todo add Array with method __array(self) and array() function
   CB.Iterator = Interface(
     'Iterator',
     {
       method.iter:WithDefault(iterator_iter),
+      method.call:WithDefault(iterator_call),
       method.inext,
     },
-    CB.Iterable
+    CB.Iterable,
+    CB.Callable
   )
 
   local itables = {'__simple_methods', '__meta_methods'}
@@ -97,6 +103,8 @@ function InitCommonBases(common, Interface)
       end
     end
 
+    itf.__all_supers[self] = true
+
     return true
   end
 
@@ -107,6 +115,9 @@ function InitCommonBases(common, Interface)
   --endregion
 
   --region Common
+  -- todo move to CommonEx.lua
+  -- todo remove err_level from all functions
+  -- todo inline not_of_type
   local function not_of_type(ins, typ, level)
     error('instance of type ' .. ins.__class.__name .. ' is not ' .. typ, level + 1)
   end
@@ -116,6 +127,7 @@ function InitCommonBases(common, Interface)
   local Iterable = CB.Iterable
   local Iterator = CB.Iterator
   local Reversible = CB.Reversible
+  local Array = CB.Array
 
   function common_ex.contains(container, value, err_level)
     if isinstance(container, Container) then
@@ -146,7 +158,24 @@ function InitCommonBases(common, Interface)
       return reversible:__reverse()
     end
 
-    not_of_type(reversible, 'a reversible', (err_level or 1) + 1)
+    not_of_type(reversible, 'reversible', (err_level or 1) + 1)
+  end
+
+  function common_ex.array(ins)
+    if isinstance(ins, Array) then
+      return ins:__array()
+    end
+
+    if isinstance(ins, Iterable) then
+      local result = {}
+      -- keep it simple, only the first emitted value is added to the result
+      for v in ins:__iter() do
+        table.insert(result, v)
+      end
+      return result
+    end
+
+    error('instance of type ' .. ins.__class.__name .. ' cannot be represented as array', 2)
   end
 
   for name, value in pairs(common_ex) do
