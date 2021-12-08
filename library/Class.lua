@@ -243,6 +243,8 @@ function InitClassPackage(common)
     '__cls',
   })
 
+  local interface_prepare_class_deftable
+
   local function create_class(name, deftable, ...)
     --region Check arguments
     if class_names[name] then
@@ -271,7 +273,7 @@ function InitClassPackage(common)
     --endregion
 
     for _, itf in ipairs(parent_interfaces) do
-      itf:PrepareClassDeftable(deftable, parent_class, 3)
+      interface_prepare_class_deftable(itf, deftable, parent_class)
     end
 
     local class = {
@@ -431,9 +433,9 @@ function InitClassPackage(common)
     return rawequal(self, itf) or (isinterface(itf) and itf.__all_supers[self] or false)
   end
 
-  function interface_meta.__index:PrepareClassDeftable(class_deftable, class_parent, err_level)
+  local Class_meta = Class.meta
+  interface_prepare_class_deftable = function(self, class_deftable, class_parent)
     class_parent = class_parent or {__meta = {}}
-    err_level = (err_level or 1) + 1
 
     for _, m_table in ipairs(self.__simple_methods) do
       local m_name = m_table.name
@@ -444,11 +446,11 @@ function InitClassPackage(common)
           class_deftable[m_name] = m_table.default
         else
           error('any descendant of ' .. self.__name .. ' must implement '
-            .. m_name .. m_table.signature, err_level)
+            .. m_name .. m_table.signature, 4)
         end
       elseif type(method) ~= 'function' then
         error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
-          ' as a function with signature ' .. m_table.signature, err_level)
+          ' as a function with signature ' .. m_table.signature, 4)
       end
     end
 
@@ -465,14 +467,14 @@ function InitClassPackage(common)
 
       if rawequal(method, nil) then
         if m_table.default then
-          class_deftable[m_name] = Class.meta(m_table.default)
+          class_deftable[m_name] = Class_meta(m_table.default)
         else
           error('any descendant of ' .. self.__name .. ' must implement metamethod '
-            .. m_name .. m_table.signature, 2)
+            .. m_name .. m_table.signature, 4)
         end
       elseif type(method) ~= 'function' then
         error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
-          ' as a metamethod with signature ' .. m_table.signature, 2)
+          ' as a metamethod with signature ' .. m_table.signature, 4)
       end
     end
 
