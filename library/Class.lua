@@ -97,17 +97,31 @@ function InitClassPackage(common)
     error('instance of type ' .. cls.__name .. ' does not have gettable key ' .. repr(key), 3)
   end
 
-  local super_meta = gen_meta('super', false)
 
-  function super_meta.__newindex(self, key, value)
-    newindex(self.__ins, self.__cls, key, value)
+
+  local super_meta = {__metatable = true}
+
+  function super_meta:__len()
+    return self.__cls.__meta.__len(self.__ins)
   end
 
-  function super_meta.__index(self, key)
+  function super_meta:__index(key)
     return index(self.__ins, self.__cls, key)
   end
 
-  function super_meta.__tostring(self)
+  function super_meta:__newindex(key, value)
+    newindex(self.__ins, self.__cls, key, value)
+  end
+
+  function super_meta:__ipairs()
+    return self.__cls.__meta.__ipairs(self.__ins)
+  end
+
+  function super_meta:__pairs()
+    return self.__cls.__meta.__pairs(self.__ins)
+  end
+
+  function super_meta:__tostring()
     return '<super: ' .. tostring(self.__cls) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
   end
 
