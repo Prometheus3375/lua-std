@@ -34,7 +34,6 @@ function InitCommonBases(common, Interface)
   local function iterator_iter(self) return self end
   local function iterator_call(self) return self:__inext() end
 
-  -- todo add Array with method __array(self) and array() function
   CB.Iterator = Interface(
     'Iterator',
     {
@@ -76,7 +75,7 @@ function InitCommonBases(common, Interface)
     return true
   end
 
-  local function is_ancestor_of(self, itf)
+  local function is_ancestor_or_check_methods_and_add_ancestor(self, itf)
     if rawequal(self, itf) then
       return true
     end
@@ -109,8 +108,8 @@ function InitCommonBases(common, Interface)
   end
 
   for _, base in pairs(CB) do
-    rawset(base, 'IsAncestorOf', is_ancestor_of)
     rawset(base, 'HasRegistered', has_registered_or_check_methods_and_register)
+    rawset(base, 'IsAncestorOf', is_ancestor_or_check_methods_and_add_ancestor)
   end
   --endregion
 
@@ -183,5 +182,5 @@ function InitCommonBases(common, Interface)
   end
   --endregion
 
-  return setmetatable(CB, common.generate_package_metatable('CommonBases'))
+  return setmetatable(CB, common.generate_package_metatable('Common Bases'))
 end
