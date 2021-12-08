@@ -59,22 +59,6 @@ function InitClassPackage(common)
     return string.sub(result, string.len(meta.__name) + 3)
   end
 
-  local function newindex(self, cls, key, value)
-    -- fallback for nil public fields
-    if cls.__public[key] then
-      rawset(self, key, value)
-      return
-    end
-    -- setters
-    local prop = cls.__properties[key]
-    if prop then
-      prop.setter(self, value)
-      return
-    end
-
-    error('instance of type ' .. cls.__name .. ' does not have settable key ' .. repr(key), 3)
-  end
-
   local function index(self, cls, key)
     -- fallback for nil public fields
     if cls.__public[key] then
@@ -97,7 +81,21 @@ function InitClassPackage(common)
     error('instance of type ' .. cls.__name .. ' does not have gettable key ' .. repr(key), 3)
   end
 
+  local function newindex(self, cls, key, value)
+    -- fallback for nil public fields
+    if cls.__public[key] then
+      rawset(self, key, value)
+      return
+    end
+    -- setters
+    local prop = cls.__properties[key]
+    if prop then
+      prop.setter(self, value)
+      return
+    end
 
+    error('instance of type ' .. cls.__name .. ' does not have settable key ' .. repr(key), 3)
+  end
 
   local super_meta = {__metatable = true}
 
