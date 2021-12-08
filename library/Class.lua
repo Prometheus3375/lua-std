@@ -44,14 +44,6 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
-  function Class.typeof(ins)
-    return ins.__class
-  end
-
-  function Class.nameof(cls)
-    return cls.__name
-  end
-
   function Class.addressof(ins)
     local meta = ins.__class.__meta
     local str = meta.__tostring
