@@ -195,35 +195,35 @@ function InitClassPackage(common)
   -- then the error states that class of instance does not have __len.
   -- Thus, checks are added to __len, __ipairs and __pairs to emit correct errors.
   function super_meta:__len()
-    local len = self.__cls.__meta.__len
+    local len = self.__class.__meta.__len
     if len == instance_len then
-      error(repr(self.__cls.__name) .. ' instance does not support length operator', 2)
+      error(repr(self.__class.__name) .. ' instance does not support length operator', 2)
     end
 
     return len(self.__ins)
   end
 
   function super_meta:__index(key)
-    return index(self.__ins, self.__cls, key)
+    return index(self.__ins, self.__class, key)
   end
 
   function super_meta:__newindex(key, value)
-    newindex(self.__ins, self.__cls, key, value)
+    newindex(self.__ins, self.__class, key, value)
   end
 
   function super_meta:__ipairs()
-    local ipairs = self.__cls.__meta.__ipairs
+    local ipairs = self.__class.__meta.__ipairs
     if ipairs == instance_ipairs then
-      error(repr(self.__cls.__name) .. ' instance does not support ipairs()', 2)
+      error(repr(self.__class.__name) .. ' instance does not support ipairs()', 2)
     end
 
     return ipairs(self.__ins)
   end
 
   function super_meta:__pairs()
-    local pairs = self.__cls.__meta.__pairs
+    local pairs = self.__class.__meta.__pairs
     if pairs == instance_pairs then
-      error(repr(self.__cls.__name) .. ' instance does not support pairs()', 2)
+      error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
     end
 
     return pairs(self.__ins)
@@ -232,7 +232,7 @@ function InitClassPackage(common)
   -- super object must have a string representation for debugging
   -- Thus, it is not possible to use superclass' __tostring
   function super_meta:__tostring()
-    return '<super: ' .. tostring(self.__cls) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
+    return '<super: ' .. tostring(self.__class) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
   end
 
   local function super_check_parent(cls, parent)
@@ -254,7 +254,7 @@ function InitClassPackage(common)
 
   function Class.super(ins, parent)
     parent = super_check_parent(ins.__class, parent)
-    return setmetatable({__ins = ins, __cls = parent}, super_meta)
+    return setmetatable({__ins = ins, __class = parent}, super_meta)
   end
 
   local addressof = Class.addressof
@@ -275,10 +275,10 @@ function InitClassPackage(common)
   }
 
   local prohibited_keys = common.set({
-    -- instance fields
+    -- instance keys
     '__class',
     '__values',
-    -- class fields
+    -- class keys
     '__name',
     '__public',
     '__readonly',
@@ -290,12 +290,12 @@ function InitClassPackage(common)
     '__sub_metas',
     'super',
     '__supers',
-    -- meta for instances
+    -- meta keys for instances
     '__newindex',
     '__index',
-    -- super fields
+    -- super keys
     '__ins',
-    '__cls',
+    '__class',
   })
 
   local subclass
