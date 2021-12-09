@@ -44,21 +44,6 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
-  function Class.addressof(ins)
-    local meta = ins.__class.__meta
-    local str = meta.__tostring
-    local result
-    if str then
-      meta.__tostring = nil
-      result = tostring(ins)
-      meta.__tostring = str
-    else
-      result = tostring(ins)
-    end
-
-    return string.sub(result, string.len(meta.__name) + 3)
-  end
-
   function Class.field(public)
     return {type = 'field', public = public}
   end
@@ -178,6 +163,25 @@ function InitClassPackage(common)
     error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
   end
 
+  function Class.tostring(ins)
+    local meta = ins.__class.__meta
+    local str = rawget(meta, '__tostring')
+    if str then
+      meta.__tostring = nil
+      local result = tostring(ins)
+      meta.__tostring = str
+      return result
+    end
+
+    return tostring(ins)
+  end
+
+  local instance_raw_tostring = Class.tostring
+
+  function Class.addressof(ins)
+    return string.sub(instance_raw_tostring(ins), string.len(ins.__class.__meta.__name) + 3)
+  end
+
   local super_meta = {__metatable = true}
 
   -- If superclass does not have __len, but the class of instance has,
@@ -224,22 +228,37 @@ function InitClassPackage(common)
     return '<super: ' .. tostring(self.__cls) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
   end
 
-  function Class.super(ins, parent)
-    local cls = ins.__class
+  local function super_check_parent(cls, parent)
     if isclass(parent) then
       if not cls.__supers[parent] then
-        error('class ' .. cls.__name .. ' does not have superclass ' .. parent.__name, 2)
+        error('class ' .. repr(cls.__name) .. ' does not have superclass ' .. repr(parent.__name), 3)
       end
     elseif rawequal(parent, nil) then
       parent = cls.super
       if not parent then
-        error('class ' .. cls.__name .. ' does not have a superclass', 2)
+        error('class ' .. repr(cls.__name) .. ' does not have a superclass', 3)
       end
     else
-      error('the second argument must be either a class or nil, got ' .. repr(parent), 2)
+      error('the second argument must be either a class or nil, got ' .. repr(parent), 3)
     end
 
+    return parent
+  end
+
+  function Class.super(ins, parent)
+    parent = super_check_parent(ins.__class, parent)
     return setmetatable({__ins = ins, __cls = parent}, super_meta)
+  end
+
+  local addressof = Class.addressof
+
+  function Class.super_tostring(ins, parent)
+    parent = super_check_parent(ins.__class, parent)
+    local meta = parent.__meta
+    local str = meta.__tostring
+    if str then return str(ins) end
+
+    return meta.__name .. ': ' .. addressof(ins)
   end
 
   local class_indexers = {
