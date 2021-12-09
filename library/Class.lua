@@ -44,8 +44,14 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
+  -- todo add flag allow_numeric_indexes and keys for special functions to get and set them
+  -- todo consider allowing using numeric indexes directly in self
+  -- if yes, then allow Class.meta to accept nil
+  -- and implement implement rawlen, rawpairs, rawipairs for fallback in super object
+  -- todo remove default __ipairs, ipairs() uses __index by default
+
   function Class.field(public)
-    return {type = 'field', public = public}
+    return {type = 'field', public = public and true or false}
   end
 
   -- todo check that getter and setter are functions
@@ -268,7 +274,7 @@ function InitClassPackage(common)
     '__properties',
   }
 
-  local special_fields = common.set({
+  local prohibited_keys = common.set({
     -- instance fields
     '__class',
     '__values',
@@ -300,6 +306,15 @@ function InitClassPackage(common)
     --region Check arguments
     if class_names[name] then
       error('name ' .. repr(name) .. ' is already in use', 3)
+    end
+
+    for k, _ in pairs(deftable) do
+      if type(k) ~= 'string' then
+        error('only string keys are allowed to use inside a class, got '
+          .. tostring(k) .. ' of type \'' .. type(k) .. '\'', 3)
+      elseif prohibited_keys[k] then
+        error('key ' .. repr(k) .. ' is prohibited to use inside a class', 3)
+      end
     end
 
     local parents = table.pack(...)
@@ -359,9 +374,7 @@ function InitClassPackage(common)
     for k, v in pairs(deftable) do
       if k == 'new' then
         init = v
-      elseif special_fields[k] then
-        error('field name ' .. repr(k) .. ' is prohibited to use inside a class', 3)
-      elseif type(v) == 'table' and class_key_initializers[v.type] then
+      elseif type(v) == 'table' and class_key_initializers[v.type] ~= nil then
         class_key_initializers[v.type](class, k, v)
       else
         class[k] = v
@@ -416,7 +429,7 @@ function InitClassPackage(common)
   end
 
   local package_class_meta = gen_pack_meta('Class')
-  function package_class_meta.__call(_, ...) create_class(...) end
+  function package_class_meta.__call(_, ...) return create_class(...) end
   setmetatable(Class, package_class_meta)
   --endregion
 
@@ -623,7 +636,7 @@ function InitClassPackage(common)
   end
 
   local package_interface_meta = gen_pack_meta('Interface')
-  function package_interface_meta.__call(_, ...) define_interface(...) end
+  function package_interface_meta.__call(_, ...) return define_interface(...) end
   setmetatable(Interface, package_interface_meta)
   --endregion
 
