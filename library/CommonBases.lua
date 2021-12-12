@@ -6,8 +6,6 @@ function InitCommonBases(common, Interface)
   local CB = {}
 
   local repr = common.repr
-  local isclass = common.isclass
-  local isinterface = common.isinterface
   local isinstance = common.isinstance
   local def_method = Interface.DefineMethod
   --endregion
@@ -23,14 +21,14 @@ function InitCommonBases(common, Interface)
     array = def_method('__array', '(self)'),
   }
 
-  CB.Container = Interface('Container', {method.contains})
-  CB.Iterable = Interface('Iterable', {method.iter})
-  CB.Reversible = Interface('Reversible', {method.reverse})
-  CB.Sized = Interface('Sized', {method.len})
-  CB.Callable = Interface('Callable', {method.call})
-  CB.Collection = Interface('Collection', {}, CB.Container, CB.Iterable, CB.Sized)
-  CB.OrderedCollection = Interface('OrderedCollection', {}, CB.Collection, CB.Reversible)
-  CB.Array = Interface('Array', {method.array})
+  CB.Container = Interface('Container', true, {method.contains})
+  CB.Iterable = Interface('Iterable', true, {method.iter})
+  CB.Reversible = Interface('Reversible', true, {method.reverse})
+  CB.Sized = Interface('Sized', true, {method.len})
+  CB.Callable = Interface('Callable', true, {method.call})
+  CB.Collection = Interface('Collection', true, {}, CB.Container, CB.Iterable, CB.Sized)
+  CB.OrderedCollection = Interface('OrderedCollection', true, {}, CB.Collection, CB.Reversible)
+  CB.Array = Interface('Array', true, {method.array})
 
   local function iterator_iter(self) return self end
   local function iterator_call(self) return self:__inext() end
@@ -45,73 +43,6 @@ function InitCommonBases(common, Interface)
     CB.Iterable,
     CB.Callable
   )
-
-  local itables = {'__simple_methods', '__meta_methods'}
-
-  local function has_registered_or_check_methods_and_register(self, cls)
-    if not isclass(cls) then
-      return false
-    end
-
-    if self.__registered[cls] then
-      return true
-    end
-
-    --region Check whether cls has all methods of self
-    for _, m_table in ipairs(self.__simple_methods) do
-      if type(cls[m_table.name]) ~= 'function' then
-        return false
-      end
-    end
-
-    for _, m_table in ipairs(self.__meta_methods) do
-      if type(cls.__meta[m_table.name]) ~= 'function' then
-        return false
-      end
-    end
-    --endregion
-
-    self:Register(cls)
-
-    return true
-  end
-
-  local function is_ancestor_or_check_methods_and_add_ancestor(self, itf)
-    if rawequal(self, itf) then
-      return true
-    end
-
-    if not isinterface(itf) then
-      return false
-    end
-
-    if itf.__all_supers[self] then
-      return true
-    end
-
-    -- Check whether itf has all methods of self
-    for _, field in ipairs(itables) do
-      local name2method = {}
-      for _, m_table in ipairs(itf[field]) do
-        name2method[m_table.name] = m_table
-      end
-
-      for _, m_table in ipairs(self[field]) do
-        if m_table ~= name2method[m_table.name] then
-          return false
-        end
-      end
-    end
-
-    itf.__all_supers[self] = true
-
-    return true
-  end
-
-  for _, base in pairs(CB) do
-    rawset(base, 'HasRegistered', has_registered_or_check_methods_and_register)
-    rawset(base, 'IsAncestorOf', is_ancestor_or_check_methods_and_add_ancestor)
-  end
   --endregion
 
   --region Common
