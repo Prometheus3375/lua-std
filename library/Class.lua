@@ -4,8 +4,8 @@ function InitClassPackage(common)
 
   local repr = common.repr
   local number2index = common.number2index
-  local set_union = common.set_union
   local set2array = common.set2array
+  local set_union = common.set_union
   local gen_meta = common.generate_protected_metatable
   local gen_pack_meta = common.generate_package_metatable
 
@@ -44,7 +44,6 @@ function InitClassPackage(common)
   -- todo add flag allow_numeric_indexes and keys for special functions to get and set them
   -- todo consider allowing using numeric indexes directly in self
   -- if yes, then allow Class.meta to accept nil
-  -- and implement implement rawlen, rawpairs, rawipairs for fallback in super object
   -- todo remove default __ipairs, ipairs() uses __index by default
 
   function Class.field(public)
@@ -485,10 +484,12 @@ function InitClassPackage(common)
   end
 
   function Interface.DefineMethod(name, signature, is_metamethod)
+    -- todo check that name is not in prohibited_keys
+    -- todo check that signature is string
     return setmetatable({
       name = name,
       signature = signature,
-      is_metamethod = is_metamethod or false,
+      is_metamethod = is_metamethod and true or false,
     }, method_meta)
   end
   --endregion
@@ -515,6 +516,7 @@ function InitClassPackage(common)
       end
 
       cls.__interfaces[self] = true
+      set_union(cls.__interfaces, self.__all_ancestors)
       return true
     end
 
@@ -540,6 +542,7 @@ function InitClassPackage(common)
       end
 
       other.__all_ancestors[self] = true
+      set_union(other.__all_ancestors, self.__all_ancestors)
       return true
     end
 
@@ -607,6 +610,9 @@ function InitClassPackage(common)
       error('method definition table must be a table, got '
         .. repr(methods) .. ' of type ' .. type(methods), 3)
     end
+
+    -- todo check that methods content are all methods
+    -- using m_table.WithDefault == method_meta.__index.WithDefault
 
     local passed_parents = table.pack(...)
     local parents = {}
