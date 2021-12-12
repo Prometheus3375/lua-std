@@ -15,6 +15,40 @@ function InitCommonPackage()
 
   local repr = common.repr
 
+  function common.rawlen(t)
+    if type(t) ~= 'table' then
+      error('the first argument must be a table, got ' .. repr(t) .. ' of type ' .. type(t), 2)
+    end
+
+    local index = 1
+    while rawget(t, index) ~= nil do
+      index = index + 1
+    end
+    return index - 1
+  end
+
+  function common.rawpairs(t)
+    return next, t, nil
+  end
+
+  local function rawipairs_next(t, index)
+    index = index + 1
+    local value = rawget(t, index)
+    if value ~= nil then
+      return index, value
+    end
+
+    return nil
+  end
+
+  function common.rawipairs(t)
+    if type(t) ~= 'table' then
+      error('the first argument must be a table, got ' .. repr(t) .. ' of type ' .. type(t), 2)
+    end
+
+    return rawipairs_next, t, 0
+  end
+
   function common.number2index(num)
     local rem = num % 100
     if rem == 11 or rem == 12 or rem == 13 then
@@ -35,12 +69,31 @@ function InitCommonPackage()
     return num .. 'th'
   end
 
-  function common.set(t)
-    local set = {}
-    for _, v in ipairs(t) do
-      set[v] = true
+  -- todo: create package primitive set for all set operations?
+  function common.array2set(a)
+    local s = {}
+    for _, v in ipairs(a) do
+      s[v] = true
     end
-    return set
+    return s
+  end
+
+  function common.set2array(s)
+    local a = {}
+    for v, _ in pairs(s) do
+      table.insert(a, v)
+    end
+    return a
+  end
+
+  function common.set_union(result, ...)
+    result = result or {}
+    for _, s in ipairs({result, ...}) do
+      for v, _ in pairs(s) do
+        result[v] = true
+      end
+    end
+    return result
   end
 
   local function enum_next(state, index)
@@ -61,8 +114,8 @@ function InitCommonPackage()
     return enum_next, {iterator, state, init_value}, (start or 1) - 1
   end
 
-  function common.enum_pairs(t, start)
-    return enum_next, {pairs(t)}, (start or 1) - 1
+  function common.enum_pairs(t, start, raw)
+    return enum_next, raw and {next, t, nil} or {pairs(t)}, (start or 1) - 1
   end
 
   function common.generate_protected_metatable(name, plural)
