@@ -54,10 +54,13 @@ function InitClassPackage(common)
     return {type = 'field', public = public and true or false}
   end
 
-  -- todo check that getter and setter are functions
   function Class.property(getter, setter)
     if getter == nil and setter == nil then
       error('property must have either a getter or a setter or both', 2)
+    elseif getter ~= nil and type(getter) ~= 'function' then
+      error('property getter must be a function, got ' .. repr(getter), 2)
+    elseif setter ~= nil and type(setter) ~= 'function' then
+      error('property setter must be a function, got ' .. repr(setter), 2)
     end
     return {type = 'property', getter = getter, setter = setter}
   end
