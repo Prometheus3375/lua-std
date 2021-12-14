@@ -44,7 +44,7 @@ function InitClassPackage(common)
   --region Class variables
   -- todo add flag allow_numeric_indexes and keys for special functions to get and set them
   -- todo consider allowing using numeric indexes directly in self
-  -- if yes, then allow Class.meta to accept nil
+  -- if yes, in create_class after parent_class is processed replace any None in meta with nil
   -- todo remove default __ipairs, ipairs() uses __index by default
   local known_indexers = setmetatable({}, __meta_weak_keys)
   local function is_indexer(v) return known_indexers[v] or false end
@@ -706,10 +706,6 @@ function InitClassPackage(common)
     local classes = {}
     local interfaces = {}
 
-    if supers.n == 0 then
-      error('no ancestor is passed', 3)
-    end
-
     for i = 1, supers.n do
       local other = supers[i]
       if isclass(other) then
@@ -717,10 +713,8 @@ function InitClassPackage(common)
       elseif isinterface(other) then
         table.insert(interfaces, other)
       else
-        error('all ancestors must be either classes or interfaces, the'
-          .. number2index(i) .. ' passed ancestor is ' .. repr(other),
-          3
-        )
+        error('all ancestors must be either classes or interfaces, the '
+          .. number2index(i) .. ' passed ancestor is ' .. repr(other), 3)
       end
     end
 
@@ -745,6 +739,9 @@ function InitClassPackage(common)
 
   local function issubclass(value, ...)
     local classes, interfaces = issubclass_get_supers(...)
+    if #classes == 0 and #interfaces == 0 then
+      error('no ancestor is passed', 2)
+    end
 
     if isclass(value) then
       return issubclass_class_case(value, classes, interfaces)
@@ -760,12 +757,16 @@ function InitClassPackage(common)
       return false
     end
 
-    error('the first argument must be either a class or an interface, got ' .. repr(value), 3)
+    error('the first argument must be either a class or an interface, got ' .. repr(value), 2)
   end
 
   local function isinstance(ins, ...)
     if type(ins) == 'table' and isclass(ins.__class) then
-      return issubclass_class_case(ins.__class, issubclass_get_supers(...))
+      local classes, interfaces = issubclass_get_supers(...)
+      if #classes == 0 and #interfaces == 0 then
+        return true
+      end
+      return issubclass_class_case(ins.__class, classes, interfaces)
     end
 
     return false
