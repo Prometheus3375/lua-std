@@ -15,9 +15,15 @@ function InitCommonPackage()
 
   local repr = common.repr
 
+  function common.type_repr(v, sep)
+    return type(v) .. (sep or ' ') .. repr(v)
+  end
+
+  local type_repr = common.type_repr
+
   function common.rawlen(t)
     if type(t) ~= 'table' then
-      error('the first argument must be a table, got ' .. repr(t) .. ' of type ' .. type(t), 2)
+      error('the first argument must be a table, got ' .. type_repr(t), 2)
     end
 
     local index = 1
@@ -43,7 +49,7 @@ function InitCommonPackage()
 
   function common.rawipairs(t)
     if type(t) ~= 'table' then
-      error('the first argument must be a table, got ' .. repr(t) .. ' of type ' .. type(t), 2)
+      error('the first argument must be a table, got ' .. type_repr(t), 2)
     end
 
     return rawipairs_next, t, 0
