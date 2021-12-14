@@ -3,6 +3,7 @@ function InitClassPackage(common)
   common = common or _ENV.common or _ENV.Common
 
   local repr = common.repr
+  local type_repr = common.type_repr
   local number2index = common.number2index
   local set2array = common.set2array
   local set_union = common.set_union
@@ -45,9 +46,13 @@ function InitClassPackage(common)
   -- todo consider allowing using numeric indexes directly in self
   -- if yes, then allow Class.meta to accept nil
   -- todo remove default __ipairs, ipairs() uses __index by default
+  local known_indexers = setmetatable({}, __meta_weak_keys)
+  local function is_indexer(v) return known_indexers[v] or false end
 
   function Class.field(public)
-    return {type = 'field', public = public and true or false}
+    local result = {type = 'field', public = public and true or false}
+    known_indexers[result] = true
+    return result
   end
 
   function Class.property(getter, setter)
@@ -58,14 +63,18 @@ function InitClassPackage(common)
     elseif setter ~= nil and type(setter) ~= 'function' then
       error('property setter must be a function, got ' .. repr(setter), 2)
     end
-    return {type = 'property', getter = getter, setter = setter}
+    local result = {type = 'property', getter = getter, setter = setter}
+    known_indexers[result] = true
+    return result
   end
 
   function Class.meta(value)
     if value == nil then
       error('meta must have a value', 2)
     end
-    return {type = 'meta', value = value}
+    local result = {type = 'meta', value = value}
+    known_indexers[result] = true
+    return result
   end
 
   local class_key_initializers = {
@@ -90,7 +99,7 @@ function InitClassPackage(common)
   }
 
   local function index(self, cls, key)
-    -- fallback for nil public fields
+    -- fallback for nil public fields and super object
     if cls.__public[key] then
       return rawget(self, key)
     end
@@ -112,7 +121,7 @@ function InitClassPackage(common)
   end
 
   local function newindex(self, cls, key, value)
-    -- fallback for nil public fields
+    -- fallback for nil public fields and super object
     if cls.__public[key] then
       rawset(self, key, value)
       return
@@ -282,14 +291,12 @@ function InitClassPackage(common)
     '__public',
     '__readonly',
     '__properties',
-    'subclass',
     '__superclass',
     '__superclasses',
     '__interfaces',
     '__subclasses',
     '__sub_metas',
     '__meta',
-    '__init',
     -- meta keys for instances
     '__newindex',
     '__index',
@@ -298,14 +305,17 @@ function InitClassPackage(common)
     '__class',
   })
 
-  local subclass
+  local special_keys = {
+    __init = 'function'
+  }
+
   local function empty_function() end
   local interface_prepare_class_deftable
 
   local function create_class(name, deftable, ...)
     --region Check arguments
     if type(name) ~= 'string' then
-      error('name must be a string, got ' .. repr(name) .. ' of type ' .. type(name), 3)
+      error('name must be a string, got ' .. type_repr(name), 3)
     end
 
     if class_names[name] then
@@ -313,16 +323,16 @@ function InitClassPackage(common)
     end
 
     if type(deftable) ~= 'table' then
-      error('definition table must be a table, got '
-        .. repr(deftable) .. ' of type ' .. type(deftable), 3)
+      error('definition table must be a table, got ' .. type_repr(deftable), 3)
     end
 
-    for k, _ in pairs(deftable) do
+    for k, v in pairs(deftable) do
       if type(k) ~= 'string' then
-        error('only string keys are allowed to use inside a class, got '
-          .. tostring(k) .. ' of type ' .. type(k), 3)
+        error('only string keys are allowed to use inside a class, got ' .. type_repr(k), 3)
       elseif prohibited_keys[k] then
         error('key ' .. repr(k) .. ' is prohibited to use inside a class', 3)
+      elseif special_keys[k] and type(v) ~= special_keys[k] then
+        error('key ' .. repr(k) .. ' must be a ' .. special_keys[k] .. ', got ' .. type_repr(v), 3)
       end
     end
 
@@ -354,17 +364,16 @@ function InitClassPackage(common)
     local class = {
       __name = name,
       -- indexers
-      __public = {},
+      __public = {__class = true, __values = true},
       __readonly = {},
       __properties = {},
       -- inheritance
-      subclass = subclass,
       __superclasses = {}, -- all ancestors, a set
       __interfaces = {}, -- all implemented interfaces, a set; may change over time
       __subclasses = {}, -- only direct descendants, an array
       __sub_metas = {}, -- metatables for indexers of direct descendants
       -- own instances
-      new = class_new_instance,
+      __init = empty_function,
       __meta = {
         __len = instance_len,
         __index = instance_index,
@@ -374,12 +383,6 @@ function InitClassPackage(common)
         __metatable = true,
       },
     }
-
-    local init = empty_function
-    local ins_meta = class.__meta
-    local supers = class.__superclasses
-    local interfaces = class.__interfaces
-    local sub_metas = class.__sub_metas
     local cls_meta = {
       __len = class_len,
       __newindex = class_newindex,
@@ -391,9 +394,7 @@ function InitClassPackage(common)
     }
 
     for k, v in pairs(deftable) do
-      if k == 'new' then
-        init = v
-      elseif type(v) == 'table' and class_key_initializers[v.type] ~= nil then
+      if is_indexer(v) then
         class_key_initializers[v.type](class, k, v)
       else
         class[k] = v
@@ -401,21 +402,24 @@ function InitClassPackage(common)
     end
 
     for _, indexer in ipairs(class_indexers) do
-      sub_metas[indexer] = {__index = class[indexer]}
+      class.__sub_metas[indexer] = {__index = class[indexer]}
     end
 
+    local class_interfaces = class.__interfaces
     for _, itf in ipairs(parent_interfaces) do
-      interfaces[itf] = true
-      set_union(interfaces, itf.__all_ancestors)
+      class_interfaces[itf] = true
+      set_union(class_interfaces, itf.__all_ancestors)
     end
 
     if parent_class then
+      local ins_meta = class.__meta
+
       class.__superclass = parent_class
       table.insert(parent_class.__subclasses, class)
 
-      supers[parent_class] = true
-      set_union(supers, parent_class.__superclasses)
-      set_union(interfaces, parent_class.__interfaces)
+      class.__superclasses[parent_class] = true
+      set_union(class.__superclasses, parent_class.__superclasses)
+      set_union(class_interfaces, parent_class.__interfaces)
 
       for _, indexer in ipairs(class_indexers) do
         setmetatable(class[indexer], parent_class.__sub_metas[indexer])
@@ -427,20 +431,14 @@ function InitClassPackage(common)
       end
       cls_meta.__index = parent_class
 
-      if init == empty_function then
-        init = parent_class.__init
+      if class.__init == empty_function then
+        class.__init = parent_class.__init
       end
     end
-
-    class.__init = init
 
     known_classes[class] = true
     class_names[name] = class
     return setmetatable(class, cls_meta)
-  end
-
-  subclass = function(cls, name, deftable, ...)
-    return create_class(name, deftable, cls, ...)
   end
 
   local package_class_meta = gen_pack_meta('Class')
@@ -484,7 +482,7 @@ function InitClassPackage(common)
   end
 
   function Interface.DefineMethod(name, signature, is_metamethod)
-    -- todo check that name is not in prohibited_keys
+    -- todo check that name is a string and not in prohibited_keys
     -- todo check that signature is string
     return setmetatable({
       name = name,
@@ -599,7 +597,7 @@ function InitClassPackage(common)
   local function define_interface(name, allow_method_check, methods, ...)
     --region Check arguments
     if type(name) ~= 'string' then
-      error('name must be a string, got ' .. repr(name) .. ' of type ' .. type(name), 3)
+      error('name must be a string, got ' .. type_repr(name), 3)
     end
 
     if interface_names[name] then
@@ -607,8 +605,7 @@ function InitClassPackage(common)
     end
 
     if type(methods) ~= 'table' then
-      error('method definition table must be a table, got '
-        .. repr(methods) .. ' of type ' .. type(methods), 3)
+      error('method definition table must be a table, got ' .. type_repr(methods), 3)
     end
 
     -- todo check that methods content are all methods
