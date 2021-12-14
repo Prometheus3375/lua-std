@@ -75,6 +75,14 @@ function InitCommonPackage()
     return num .. 'th'
   end
 
+  function common.table_length(t)
+    local n = 0
+    for _, _ in pairs(t) do
+      n = n + 1
+    end
+    return n
+  end
+
   -- todo: create package primitive set for all set operations?
   function common.array2set(a)
     local s = {}
