@@ -19,13 +19,7 @@ function InitCommonPackage()
     return type(v) .. (sep or ' ') .. repr(v)
   end
 
-  local type_repr = common.type_repr
-
   function common.rawlen(t)
-    if type(t) ~= 'table' then
-      error('the first argument must be a table, got ' .. type_repr(t), 2)
-    end
-
     local index = 1
     while rawget(t, index) ~= nil do
       index = index + 1
@@ -48,10 +42,6 @@ function InitCommonPackage()
   end
 
   function common.rawipairs(t)
-    if type(t) ~= 'table' then
-      error('the first argument must be a table, got ' .. type_repr(t), 2)
-    end
-
     return rawipairs_next, t, 0
   end
 
