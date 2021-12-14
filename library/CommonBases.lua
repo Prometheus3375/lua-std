@@ -23,9 +23,12 @@ function InitCommonBases(common, Interface)
   CB.Container = Interface('Container', true, {method.contains})
   CB.Iterable = Interface('Iterable', true, {method.iter})
   CB.Reversible = Interface('Reversible', true, {method.reverse})
+  -- fixme any instance is sized, because __len is set
+  -- also any class without custom __len must be sized
   CB.Sized = Interface('Sized', true, {method.len})
   CB.Collection = Interface('Collection', true, {}, CB.Container, CB.Iterable, CB.Sized)
   CB.OrderedCollection = Interface('OrderedCollection', true, {}, CB.Collection, CB.Reversible)
+  -- todo add SupportsLessThan, SupportsGetNumericKey, SupportsSetNumericKey
 
   local function iterator_iter(self) return self end
   local function iterator_call(self)
