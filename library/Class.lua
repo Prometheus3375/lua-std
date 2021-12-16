@@ -5,8 +5,10 @@ function InitClassPackage(common)
   local repr = common.repr
   local type_repr = common.type_repr
   local number2index = common.number2index
+  local string_split = common.string_split
   local set2array = common.set2array
   local set_union = common.set_union
+  local isNone = common.isNone
   local gen_meta = common.generate_protected_metatable
   local gen_pack_meta = common.generate_package_metatable
 
@@ -42,10 +44,6 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
-  -- todo add special fields __get_numeric_key and __set_numeric_key
-  -- todo allow using numeric indexes directly in self
-  -- in create_class after parent_class is processed replace any None in meta with nil
-  -- todo remove default __ipairs for instances, ipairs() uses __index by default
   local known_indexers = setmetatable({}, __meta_weak_keys)
   local function is_indexer(v) return known_indexers[v] or false end
 
@@ -99,6 +97,14 @@ function InitClassPackage(common)
   }
 
   local function index(self, cls, key)
+    -- process numeric keys
+    if type(key) == 'number' then
+      if cls.__get_numeric_key then
+        return cls.__get_numeric_key(self, key)
+      else
+        error(repr(cls.__name) .. ' instance cannot get numeric keys', 3)
+      end
+    end
     -- fallback for nil public fields and super object
     if cls.__public[key] then
       return rawget(self, key)
@@ -121,6 +127,15 @@ function InitClassPackage(common)
   end
 
   local function newindex(self, cls, key, value)
+    -- process numeric keys
+    if type(key) == 'number' then
+      if cls.__set_numeric_key then
+        cls.__set_numeric_key(self, key, value)
+        return
+      else
+        error(repr(cls.__name) .. ' instance cannot set numeric keys', 3)
+      end
+    end
     -- fallback for nil public fields and super object
     if cls.__public[key] then
       rawset(self, key, value)
@@ -137,7 +152,6 @@ function InitClassPackage(common)
   end
 
   local function class_len() error('classes do not support length operator', 2) end
-  local function class_ipairs() error('classes do not support ipairs()', 2) end
   local function class_pairs() error('classes do not support pairs()', 2) end
 
   local function class_newindex(self, key, _)
@@ -170,10 +184,6 @@ function InitClassPackage(common)
     return index(self, self.__class, key)
   end
 
-  local function instance_ipairs(self)
-    error(repr(self.__class.__name) .. ' instance does not support ipairs()', 2)
-  end
-
   local function instance_pairs(self)
     error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
   end
@@ -201,11 +211,23 @@ function InitClassPackage(common)
 
   -- If superclass does not have __len, but the class of instance has,
   -- then the error states that class of instance does not have __len.
-  -- Thus, checks are added to __len, __ipairs and __pairs to emit correct errors.
+  -- Thus, checks are added to __len and __pairs to emit correct errors.
   function super_meta:__len()
     local len = self.__class.__meta.__len
     if len == instance_len then
       error(repr(self.__class.__name) .. ' instance does not support length operator', 2)
+    end
+
+    -- fallback if superclass does not have __len, but own class has
+    if len == nil then
+      local meta = self.__ins.__class.__meta
+      if meta then
+        len = meta.__len
+        local result = #self.__ins
+        meta.__len = len
+        return result
+      end
+      return #self.__ins
     end
 
     return len(self.__ins)
@@ -219,19 +241,15 @@ function InitClassPackage(common)
     newindex(self.__ins, self.__class, key, value)
   end
 
-  function super_meta:__ipairs()
-    local ipairs = self.__class.__meta.__ipairs
-    if ipairs == instance_ipairs then
-      error(repr(self.__class.__name) .. ' instance does not support ipairs()', 2)
-    end
-
-    return ipairs(self.__ins)
-  end
-
   function super_meta:__pairs()
     local pairs = self.__class.__meta.__pairs
     if pairs == instance_pairs then
       error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
+    end
+
+    -- fallback if superclass does not have __len, but own class has
+    if pairs == nil then
+      return next, self.__ins, nil
     end
 
     return pairs(self.__ins)
@@ -306,7 +324,9 @@ function InitClassPackage(common)
   })
 
   local special_keys = {
-    __init = 'function'
+    __init = 'function',
+    __get_numeric_key = 'function',
+    __set_numeric_key = 'function',
   }
 
   local function empty_function() end
@@ -378,7 +398,6 @@ function InitClassPackage(common)
         __len = instance_len,
         __index = instance_index,
         __newindex = instance_newindex,
-        __ipairs = instance_ipairs,
         __pairs = instance_pairs,
         __metatable = true,
       },
@@ -386,7 +405,6 @@ function InitClassPackage(common)
     local cls_meta = {
       __len = class_len,
       __newindex = class_newindex,
-      __ipairs = class_ipairs,
       __pairs = class_pairs,
       __tostring = class_tostring,
       __call = class_new_instance,
@@ -411,8 +429,8 @@ function InitClassPackage(common)
       set_union(class_interfaces, itf.__all_ancestors)
     end
 
+    local ins_meta = class.__meta
     if parent_class then
-      local ins_meta = class.__meta
 
       class.__superclass = parent_class
       table.insert(parent_class.__subclasses, class)
@@ -433,6 +451,12 @@ function InitClassPackage(common)
 
       if class.__init == empty_function then
         class.__init = parent_class.__init
+      end
+    end
+
+    for metaname, metamethod in pairs(ins_meta) do
+      if isNone(metamethod) then
+        ins_meta[metaname] = nil
       end
     end
 
@@ -483,9 +507,12 @@ function InitClassPackage(common)
   local argument_name_pattern = "^[a-zA-Z_][a-zA-Z_0-9]*$"
 
   function Interface.Method(args, is_meta, default, check_imp_absence)
-    if type(args) ~= 'table' then
-      error('args must be a table, got ' .. type_repr(args), 2)
+    if type(args) ~= 'string' then
+      error('args must be a string, got ' .. type_repr(args), 2)
     end
+
+    args = string.gsub(args, '%s*,%s*', ',')
+    args = string_split(args, ',')
 
     for i, arg in ipairs(args) do
       if type(arg) ~= 'string' then
