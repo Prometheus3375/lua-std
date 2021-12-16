@@ -289,7 +289,7 @@ function ExtendCommonPackage(common, Class, CB)
     )
   end
 
-  common_ex.zip_strict = Class.zip_strict('zip_strict', zip_strict, Iterator)
+  common_ex.zip_strict = Class('zip_strict', zip_strict, Iterator)
   --endregion
 
   -- todo max, min, sorted, range
