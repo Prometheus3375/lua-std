@@ -15,6 +15,7 @@ function ExtendCommonPackage(common, Class, CB)
   local Iterable = CB.Iterable
   local Iterator = CB.Iterator
   local Reversible = CB.Reversible
+  local SupportsGetNumericKey = CB.SupportsGetNumericKey
 
   local iterator_wrapper = {}
 
@@ -38,6 +39,27 @@ function ExtendCommonPackage(common, Class, CB)
 
   iterator_wrapper = Class('IteratorWrapper', iterator_wrapper, Iterator)
 
+  local sequence_iterator = {}
+
+  function sequence_iterator:__init(sequence)
+    self.__values.seq = sequence
+    self.__values.index = 0
+  end
+
+  function sequence_iterator:__inext()
+    local values = self.__values
+    local index = values.index + 1
+    local var = values.seq[index]
+    if var ~= nil then
+      values.index = index
+      return var
+    end
+
+    return nil
+  end
+
+  sequence_iterator = Class('CommonEx.SequenceIterator', sequence_iterator, Iterator)
+
   local function type_error(ins, err, level)
     level = (level or 1) + 1
     if isinstance(ins) then
@@ -47,22 +69,28 @@ function ExtendCommonPackage(common, Class, CB)
   end
 
   local function iter(ins, err_level)
-    if isinstance(ins, Iterable) then
-      local f, s, v = ins:__iter()
+    if type(ins) == 'table' then
+      if isinstance(ins, Iterable) then
+        local f, s, v = ins:__iter()
 
-      if isinstance(f, Iterator) then
-        return f
+        if isinstance(f, Iterator) then
+          return f
+        end
+
+        if type(f) == 'function' then
+          return iterator_wrapper(f, s, v)
+        else
+          error('first return value of __iter method must be an iterator instance or function, '
+            .. ins.__class.__name .. '.__iter() returned ' .. type_repr(f), (err_level or 1) + 1)
+        end
       end
 
-      if type(f) == 'function' then
-        return iterator_wrapper(f, s, v)
-      else
-        error('first return value of __iter method must be an iterator instance or function, '
-          .. ins.__class.__name .. '.__iter() returned ' .. type_repr(f), (err_level or 1) + 1)
+      local k, _ = next(ins)
+      if k == nil or type(k) == 'number' or isinstance(ins, SupportsGetNumericKey) then
+        return sequence_iterator(ins)
       end
+
     end
-    -- todo add support for SupportsItemGet
-    -- todo add support for arrays
 
     type_error(ins, 'is not an iterable', (err_level or 1) + 1)
   end
@@ -85,8 +113,10 @@ function ExtendCommonPackage(common, Class, CB)
       return result
     end
 
-    -- todo add support for SupportsItemGet
-    -- todo add support for arrays
+    local k, _ = next(ins)
+    if k == nil or type(k) == 'number' or isinstance(ins, SupportsGetNumericKey) then
+      return ins
+    end
 
     type_error(ins, 'cannot be represented as an array', 2)
   end
