@@ -5,9 +5,9 @@ function InitClassPackage(common)
   local repr = common.repr
   local type_repr = common.type_repr
   local number2index = common.number2index
-  local string_split = common.string_split
-  local set2array = common.set2array
-  local set_union = common.set_union
+  local string_split = common.string.split
+  local set2array = common.set.to_array
+  local set_union = common.set.union
   local isNone = common.isNone
   local gen_meta = common.generate_protected_metatable
   local gen_pack_meta = common.generate_package_metatable
