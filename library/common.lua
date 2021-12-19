@@ -129,10 +129,40 @@ function InitCommonPackage()
     end
   end
 
+  --region table
+  common.table = {}
+
+  function common.table:length()
+    local n = 0
+    for _, _ in next, self, nil do
+      n = n + 1
+    end
+    return n
+  end
+
+  function common.table:is_empty()
+    return next(self) == nil
+  end
+
+  function common.table:address()
+    local after_colon = string.sub(tostring(self), 8)
+    if string.sub(after_colon, 1, 2) == '0x' then
+      after_colon = string.sub(after_colon, 3)
+    end
+    return tonumber(after_colon, 16)
+  end
+
+  local table_address = common.table.address
+
+  setmetatable(common.table, gen_pack_meta('common.table'))
+  --endregion
+
   --region None
   local none_metatable = generate_protected_metatable('None', false)
   function none_metatable.__tostring() return 'None' end
-  local None = setmetatable({}, none_metatable)
+  local None = {}
+  None.__id = table_address(None)
+  setmetatable(None, none_metatable)
 
   common.None = None
 
@@ -157,24 +187,6 @@ function InitCommonPackage()
     end
     return ins
   end
-  --endregion
-
-  --region table
-  common.table = {}
-
-  function common.table:length()
-    local n = 0
-    for _, _ in pairs(self) do
-      n = n + 1
-    end
-    return n
-  end
-
-  function common.table:is_empty()
-    return next(self) == nil
-  end
-
-  setmetatable(common.table, gen_pack_meta('common.table'))
   --endregion
 
   --region set
@@ -212,12 +224,18 @@ function InitCommonPackage()
   --region string
   common.string = {}
 
-  function common.string:split(pattern, maxsplit, regex)
+  function common.string:char_at(pos)
+    local start = utf8.offset(self, pos)
+    local end_ = utf8.offset(self, 2, start) or 0
+    return string.sub(self, start, end_ - 1)
+  end
+
+  function common.string:split(pattern, maxsplit, enable_regex)
     local no_max = maxsplit == nil or maxsplit < 0
     local init = 1
     local from = {}
     local to = {}
-    local plain = not (regex and true or false)
+    local plain = not (enable_regex and true or false)
 
     while no_max or #from < maxsplit do
       local f, t = string.find(self, pattern, init, plain)
@@ -242,6 +260,9 @@ function InitCommonPackage()
 
   setmetatable(common.string, gen_pack_meta('common.string'))
   --endregion
+
+  -- todo add defaults
+  -- contains useful default methods and values, ex. instance_pairs
 
   return setmetatable(common, gen_pack_meta('common'))
 end
