@@ -12,7 +12,6 @@ function InitCommonBases(common, Class, Interface)
   CB.Callable = Interface('Callable', true, {__call = Method('self, ...', true)})
   CB.SupportsLessThan = Interface('SupportsLessThan', true, {__lt = Method('self, other', true)})
 
-  CB.Array = Interface('Array', true, {__array = Method('self', false)})
   CB.Container = Interface('Container', true, {__contains = Method('self, value', false)})
   CB.Iterable = Interface('Iterable', true, {__iter = Method('self', false)})
   CB.Reversible = Interface('Reversible', true, {__reverse = Method('self', false)})
