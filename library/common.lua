@@ -210,9 +210,11 @@ function InitCommonPackage()
 
   function common.set.union(result, ...)
     result = result or {}
-    for _, s in ipairs({result, ...}) do
+    for _, s in ipairs({...}) do
       for v, _ in pairs(s) do
-        result[v] = true
+        if result[v] == nil then
+          result[v] = true
+        end
       end
     end
     return result
