@@ -1,4 +1,5 @@
-dofile('Library/Class.lua')
+dofile('library/common.lua')
+dofile('library/Class.lua')
 
 function test_class()
   local Animal = {
@@ -6,7 +7,7 @@ function test_class()
     public_name = Field(true),
   }
 
-  function Animal:new(name)
+  function Animal:__init(name)
     local values = self.__values
     values.name = name
     self.public_name = name
@@ -18,7 +19,7 @@ function test_class()
 
   Animal = Class('Animal', Animal)
 
-  local animal = Animal:new('Pet')
+  local animal = Animal('Pet')
   animal:print()
   animal.public_name = 'Peter'
   animal:print()
@@ -29,7 +30,7 @@ function test_inheritance()
     name = Field(),
   }
 
-  function Animal:new(name)
+  function Animal:__init(name)
     local values = self.__values
     values.name = name
   end
@@ -53,30 +54,20 @@ function test_inheritance()
     print('Mammal ' .. self.name .. ' feeds its children')
   end
 
-  Mammal = Animal:subclass('Mammal', Mammal)
-  print('Superclass of ' .. nameof(Mammal) .. ' is ' .. nameof(Mammal.super))
+  Mammal = Class('Mammal', Mammal, Animal)
+  print('Superclass of ' .. Mammal.__name .. ' is ' .. Mammal.__superclass.__name)
 
-  local mammal = Mammal:new('Peter')
+  local mammal = Mammal('Peter')
   mammal:print()
   mammal:feed()
 end
 
 do
-  local orig_print = print
-  function print(...)
-    local args = table.pack(...)
-    for i = 1, args.n do
-      args[i] = tostring(args[i])
-    end
-    orig_print(table.concat(args, ' '))
-  end
+  common = InitCommonPackage()
+  Class = InitClassPackage()
 
-  Class = InitClasses()
-  typeof = Class.typeof
-  nameof = Class.nameof
-
-  issubclass = Class.issubclass
-  isinstance = Class.isinstance
+  issubclass = common.issubclass
+  isinstance = common.isinstance
 
   super = Class.super
 
@@ -85,5 +76,6 @@ do
   Meta = Class.meta
 
   test_class()
+  collectgarbage()
   test_inheritance()
 end
