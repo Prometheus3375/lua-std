@@ -1,4 +1,4 @@
-function PLSL.init.common()
+do
   local common = {}
 
   function common.repr(v)

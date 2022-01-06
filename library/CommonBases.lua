@@ -1,4 +1,4 @@
-function PLSL.init.CommonBases()
+do
   --region Initialization
   local common = PLSL.common
   local Class = PLSL.Class

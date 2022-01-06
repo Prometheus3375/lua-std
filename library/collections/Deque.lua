@@ -1,9 +1,9 @@
-function InitDeque(common, Class, Interface, CB)
+do
   --region Initialization
-  common = common or _ENV.common or _ENV.Common
-  Class = Class or _ENV.Class
-  Interface = Interface or _ENV.Interface
-  CB = CB or _ENV.CB or _ENV.CommonBases
+  local common = PLSL.common
+  local Class = PLSL.Class
+  local Interface = PLSL.Interface
+  local CB = PLSL.CommonBases
 
   local repr = common.repr
   --endregion
