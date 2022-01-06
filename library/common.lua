@@ -189,6 +189,25 @@ function PLSL.init.common()
   end
   --endregion
 
+  --region math
+  local __math = {}
+
+  function __math.round(x)
+    local n, f = math.modf(x)
+    if f == 0.5 or f == -0.5 then
+      if n % 2 == 0 then return n end
+      return n + 1
+    elseif f == -0.5 then
+      if n % 2 == 0 then return n end
+      return n - 1
+    else
+      return math.floor(x + 0.5)
+    end
+  end
+
+  PLSL.math = setmetatable(__math, gen_pack_meta('PLSL.math'))
+  --endregion
+
   --region set
   local __set = {}
 
