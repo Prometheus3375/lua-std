@@ -1,4 +1,4 @@
-function InitCommonPackage()
+function PLSL.init.common()
   local common = {}
 
   function common.repr(v)
@@ -130,9 +130,9 @@ function InitCommonPackage()
   end
 
   --region table
-  common.table = {}
+  local __table = {}
 
-  function common.table:length()
+  function __table:length()
     local n = 0
     for _, _ in next, self, nil do
       n = n + 1
@@ -140,11 +140,11 @@ function InitCommonPackage()
     return n
   end
 
-  function common.table:is_empty()
+  function __table:is_empty()
     return next(self) == nil
   end
 
-  function common.table:address()
+  function __table:address()
     local after_colon = string.sub(tostring(self), 8)
     if string.sub(after_colon, 1, 2) == '0x' then
       after_colon = string.sub(after_colon, 3)
@@ -152,9 +152,9 @@ function InitCommonPackage()
     return tonumber(after_colon, 16)
   end
 
-  local table_address = common.table.address
+  local table_address = __table.address
 
-  setmetatable(common.table, gen_pack_meta('common.table'))
+  PLSL.table = setmetatable(__table, gen_pack_meta('PLSL.table'))
   --endregion
 
   --region None
@@ -190,9 +190,9 @@ function InitCommonPackage()
   --endregion
 
   --region set
-  common.set = {}
+  local __set = {}
 
-  function common.set.from_array(a)
+  function __set.from_array(a)
     local s = {}
     for _, v in ipairs(a) do
       s[v] = true
@@ -200,7 +200,7 @@ function InitCommonPackage()
     return s
   end
 
-  function common.set.to_array(self)
+  function __set.to_array(self)
     local a = {}
     for v, _ in pairs(self) do
       table.insert(a, v)
@@ -208,7 +208,7 @@ function InitCommonPackage()
     return a
   end
 
-  function common.set.union(result, ...)
+  function __set.union(result, ...)
     result = result or {}
     for _, s in ipairs({...}) do
       for v, _ in pairs(s) do
@@ -220,19 +220,19 @@ function InitCommonPackage()
     return result
   end
 
-  setmetatable(common.set, gen_pack_meta('common.set'))
+  PLSL.set = setmetatable(__set, gen_pack_meta('PLSL.set'))
   --endregion
 
   --region string
-  common.string = {}
+  local __string = {}
 
-  function common.string:char_at(pos)
+  function __string:char_at(pos)
     local start = utf8.offset(self, pos)
     local end_ = utf8.offset(self, 2, start) or 0
     return string.sub(self, start, end_ - 1)
   end
 
-  function common.string:split(pattern, maxsplit, enable_regex)
+  function __string:split(pattern, maxsplit, enable_regex)
     local no_max = maxsplit == nil or maxsplit < 0
     local init = 1
     local from = {}
@@ -260,11 +260,11 @@ function InitCommonPackage()
     return result
   end
 
-  setmetatable(common.string, gen_pack_meta('common.string'))
+  PLSL.string = setmetatable(__string, gen_pack_meta('common.string'))
   --endregion
 
   -- todo add defaults
   -- contains useful default methods and values, ex. instance_pairs
 
-  return setmetatable(common, gen_pack_meta('common'))
+  PLSL.common = setmetatable(common, gen_pack_meta('PLSL.common'))
 end

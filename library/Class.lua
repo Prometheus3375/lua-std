@@ -1,14 +1,15 @@
-function InitClassPackage(common)
+function PLSL.init.Class()
   --region Initialization
-  common = common or _ENV.common or _ENV.Common
+  local common = PLSL.common
 
   local repr = common.repr
   local type_repr = common.type_repr
   local number2index = common.number2index
-  local table_address = common.table.address
-  local string_split = common.string.split
-  local set2array = common.set.to_array
-  local set_union = common.set.union
+  local table_address = PLSL.table.address
+  local string_split = PLSL.string.split
+  local set2array = PLSL.set.to_array
+  local array2set = PLSL.set.from_array
+  local set_union = PLSL.set.union
   local isNone = common.isNone
   local toNil = common.toNil
   local gen_meta = common.generate_protected_metatable
@@ -285,6 +286,8 @@ function InitClassPackage(common)
 
     return to_string(ins, parent)
   end
+
+  -- todo add super_ipairs
   --endregion
 
   --region Class
@@ -311,7 +314,7 @@ function InitClassPackage(common)
     return self
   end
 
-  local prohibited_keys = common.set.from_array({
+  local prohibited_keys = array2set({
     -- instance keys
     '__id',
     '__class',
@@ -489,7 +492,7 @@ function InitClassPackage(common)
   end
   --endregion
 
-  local package_class_meta = gen_pack_meta('Class')
+  local package_class_meta = gen_pack_meta('PLSL.Class')
   function package_class_meta.__call(_, ...) return create_class(...) end
   setmetatable(Class, package_class_meta)
   --endregion
@@ -771,7 +774,7 @@ function InitClassPackage(common)
     return setmetatable(interface, interface_meta)
   end
 
-  local package_interface_meta = gen_pack_meta('Interface')
+  local package_interface_meta = gen_pack_meta('PLSL.Interface')
   function package_interface_meta.__call(_, ...) return define_interface(...) end
   setmetatable(Interface, package_interface_meta)
   --endregion
@@ -856,5 +859,6 @@ function InitClassPackage(common)
   rawset(common, 'isinstance', isinstance)
   --endregion
 
-  return Class, Interface
+  PLSL.Class = Class
+  PLSL.Interface = Interface
 end
