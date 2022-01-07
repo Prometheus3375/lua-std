@@ -15,6 +15,13 @@ do
   CB.Container = Interface('Container', true, {__contains = Method('self, value', false)})
   CB.Iterable = Interface('Iterable', true, {__iter = Method('self', false)})
   CB.Reversible = Interface('Reversible', true, {__reverse = Method('self', false)})
+  CB.Hashable = Interface('Hashable', true, {__hash = Method('self', false)})
+
+  CB.SupportsPrettyString = Interface(
+    'SupportsPrettyString',
+    true,
+    {__str = Method('self', false)}
+  )
 
   CB.SupportsGetNumericKey = Interface(
     'SupportsGetNumericKey',
