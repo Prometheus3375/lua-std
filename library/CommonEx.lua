@@ -26,9 +26,9 @@ do
   end
 
   local IteratorWrapper
-  local SequenceIterator
+  local NumericIndicesIterator
   local StringIterator
-  local is_sequence
+  local supports_numeric_indices
   local iter
 
   local common_ex = {}
@@ -71,14 +71,15 @@ do
       end
     end
 
-    if is_sequence(ins) then
-      return SequenceIterator(ins)
+    if supports_numeric_indices(ins) then
+      return NumericIndicesIterator(ins)
     end
 
     type_error(ins, 'is not an iterable', (err_level or 1) + 1)
   end
 
   function common_ex.reverse(ins)
+    -- todo add support for strings
     if isinstance(ins, Reversible) then
       return ins:__reverse()
     end
@@ -121,7 +122,7 @@ do
     return type(v) == 'function' or isclass(v) or isinstance(v, Callable)
   end
 
-  function common_ex.is_sequence(seq)
+  function common_ex.supports_numeric_indices(seq)
     if type(seq) ~= 'table' then return false end
     local k1, v = next(seq)
     local k2 = next(seq, k1)
@@ -131,7 +132,7 @@ do
       -- table with a numeric key
       or type(k1) == 'number'
       -- table.pack(...)
-      or (k1 == 'n' and type(v) == 'number' and (k2 == nil or type(k2 == 'number')))
+      or (k1 == 'n' and type(v) == 'number' and (k2 == nil or type(k2) == 'number'))
       -- SupportsGetNumericKey instances
       or isinstance(seq, SupportsGetNumericKey)
   end
@@ -167,7 +168,7 @@ do
 
   --region filter
   local filter = {}
-  local function default_filter(v) return v end
+  local function default_filter() return true end
 
   function filter:__init(iterable, filter_func)
     if filter_func ~= nil and type(filter_func) ~= 'function' then
@@ -256,15 +257,15 @@ do
   common_ex.map = Class('map', map, Iterator)
   --endregion
 
-  --region SequenceIterator
-  local sequence_iterator = {}
+  --region NumericIndicesIterator
+  local ni_iterator = {}
 
-  function sequence_iterator:__init(sequence)
+  function ni_iterator:__init(sequence)
     self.__values.seq = sequence
     self.__values.index = 0
   end
 
-  function sequence_iterator:__inext()
+  function ni_iterator:__inext()
     local values = self.__values
     local index = values.index + 1
     local var = values.seq[index]
@@ -276,8 +277,8 @@ do
     return nil
   end
 
-  SequenceIterator = Class('SequenceIterator', sequence_iterator, Iterator)
-  common_ex.SequenceIterator = SequenceIterator
+  NumericIndicesIterator = Class('NumericIndicesIterator', ni_iterator, Iterator)
+  common_ex.NumericIndicesIterator = NumericIndicesIterator
   --endregion
 
   --region StringIterator
@@ -393,5 +394,5 @@ do
   end
 
   iter = common_ex.iter
-  is_sequence = common_ex.is_sequence
+  supports_numeric_indices = common_ex.supports_numeric_indices
 end
