@@ -4,6 +4,10 @@ do
   function common.repr(v)
     if type(v) == 'string' then
       v = string.format('%q', v)
+      -- todo compare current implementation and  table.concat(chars, '') with string iteration
+      --  select the fastest method
+      -- make string inline, %q formatting added \ before all \n chars
+      v = string.gsub(v, '\n', 'n')
       if string.find(v, '\'', 1, true) then
         return v
       end
@@ -23,14 +27,6 @@ do
       return v
     end
     return t .. ' ' .. v
-  end
-
-  function common.rawlen(t)
-    local index = 1
-    while rawget(t, index) ~= nil do
-      index = index + 1
-    end
-    return index - 1
   end
 
   function common.rawpairs(t)
@@ -93,6 +89,7 @@ do
     return enum_next, raw and {next, t, nil} or {pairs(t)}, (start or 1) - 1
   end
 
+  -- todo add optimized way to get address of table without metatable
   function common.get_address(v)
     local str = tostring(v)
     local _, end_ = string.find(str, ': ', 1, true)
