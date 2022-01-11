@@ -13,7 +13,7 @@ do
   local isNone = common.isNone
   local toNil = common.toNil
   local gen_meta = common.generate_protected_metatable
-  local gen_pack_meta = common.generate_package_metatable
+  local gen_module_meta = common.generate_module_metatable
 
   local __meta_weak_keys = {__mode = 'k'}
   local __meta_weak_values = {__mode = 'v'}
@@ -492,7 +492,7 @@ do
   end
   --endregion
 
-  local package_class_meta = gen_pack_meta('PLSL.Class')
+  local package_class_meta = gen_module_meta('PLSL.Class')
   function package_class_meta.__call(_, ...) return create_class(...) end
   setmetatable(Class, package_class_meta)
   --endregion
@@ -774,7 +774,7 @@ do
     return setmetatable(interface, interface_meta)
   end
 
-  local package_interface_meta = gen_pack_meta('PLSL.Interface')
+  local package_interface_meta = gen_module_meta('PLSL.Interface')
   function package_interface_meta.__call(_, ...) return define_interface(...) end
   setmetatable(Interface, package_interface_meta)
   --endregion

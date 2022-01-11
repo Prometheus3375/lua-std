@@ -116,15 +116,15 @@ do
 
   local generate_protected_metatable = common.generate_protected_metatable
 
-  function common.generate_package_metatable(name)
-    name = 'package ' .. repr(name)
+  function common.generate_module_metatable(name)
+    name = 'module ' .. repr(name)
     local meta = generate_protected_metatable(name, false)
     meta.__pairs = nil
     function meta.__tostring() return '<' .. name .. '>' end
     return meta
   end
 
-  local gen_pack_meta = common.generate_package_metatable
+  local gen_module_meta = common.generate_module_metatable
 
   function common.expose_package(package, global, renames, exclude)
     global = global or _ENV
@@ -187,7 +187,7 @@ do
     end
   end
 
-  PLSL.math = setmetatable(__math, gen_pack_meta('PLSL.math'))
+  PLSL.math = setmetatable(__math, gen_module_meta('PLSL.math'))
   --endregion
 
   --region set
@@ -221,7 +221,7 @@ do
     return result
   end
 
-  PLSL.set = setmetatable(__set, gen_pack_meta('PLSL.set'))
+  PLSL.set = setmetatable(__set, gen_module_meta('PLSL.set'))
   --endregion
 
   --region string
@@ -261,7 +261,7 @@ do
     return result
   end
 
-  PLSL.string = setmetatable(__string, gen_pack_meta('common.string'))
+  PLSL.string = setmetatable(__string, gen_module_meta('common.string'))
   --endregion
 
   --region table
@@ -279,11 +279,12 @@ do
     return next(self) == nil
   end
 
-  PLSL.table = setmetatable(__table, gen_pack_meta('PLSL.table'))
+  PLSL.table = setmetatable(__table, gen_module_meta('PLSL.table'))
   --endregion
 
   -- todo add defaults
   -- contains useful default methods and values, ex. instance_pairs
 
-  PLSL.common = setmetatable(common, gen_pack_meta('PLSL.common'))
+  -- todo move this to init?
+  PLSL.common = setmetatable(common, gen_module_meta('PLSL.common'))
 end
