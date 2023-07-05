@@ -59,6 +59,45 @@ function InitClassPackage(common)
     return string.sub(result, string.len(meta.__name) + 3)
   end
 
+  function Class.field(public)
+    return {type = 'field', public = public}
+  end
+
+  function Class.property(getter, setter)
+    if rawequal(getter, nil) and rawequal(setter, nil) then
+      error('property must have either a getter or a setter or both', 2)
+    end
+    return {type = 'property', getter = getter, setter = setter}
+  end
+
+  function Class.meta(value)
+    if rawequal(value, nil) then
+      error('meta must have a value', 2)
+    end
+    return {type = 'meta', value = value}
+  end
+
+  local class_key_initializers = {
+    field = function(cls, key, description)
+      if description.public then
+        cls.__public[key] = true
+      else
+        cls.__readonly[key] = true
+      end
+    end,
+
+    property = function(cls, key, description)
+      cls.__properties[key] = {
+        getter = description.getter,
+        setter = description.setter,
+      }
+    end,
+
+    meta = function(cls, key, description)
+      cls.__meta[key] = description.value
+    end,
+  }
+
   local function index(self, cls, key)
     -- fallback for nil public fields
     if cls.__public[key] then
@@ -95,6 +134,48 @@ function InitClassPackage(common)
     end
 
     error('instance of type ' .. cls.__name .. ' does not have settable key ' .. repr(key), 3)
+  end
+
+  local function class_len() error('classes do not support length operator', 2) end
+  local function class_ipairs() error('classes do not support ipairs()', 2) end
+  local function class_pairs() error('classes do not support pairs()', 2) end
+
+  local function class_newindex(self, key, _)
+    error('class ' .. repr(self.name) .. ' does not have key ' .. repr(key) .. ' to set', 2)
+  end
+
+  local function class_tostring(cls)
+    return '<class ' .. repr(cls.__name) .. '>'
+  end
+
+  local function class_new_instance(cls, ...)
+    local self = {
+      __class = cls,
+      __values = {},
+    }
+    setmetatable(self, cls.__meta)
+    cls.__init(self, ...)
+    return self
+  end
+
+  local function instance_len(self)
+    error(self.__class.__name .. ' instances do not support length operator', 2)
+  end
+
+  local function instance_newindex(self, key, value)
+    newindex(self, self.__class, key, value)
+  end
+
+  local function instance_index(self, key)
+    return index(self, self.__class, key)
+  end
+
+  local function instance_ipairs(self)
+    error(self.__class.__name .. ' instances do not support ipairs()', 2)
+  end
+
+  local function instance_pairs(self)
+    error(self.__class.__name .. ' instances do not support pairs()', 2)
   end
 
   local super_meta = {__metatable = true}
@@ -141,90 +222,6 @@ function InitClassPackage(common)
     return setmetatable({__ins = ins, __cls = parent}, super_meta)
   end
 
-  function Class.field(public)
-    return {type = 'field', public = public}
-  end
-
-  function Class.property(getter, setter)
-    if rawequal(getter, nil) and rawequal(setter, nil) then
-      error('property must have either a getter or a setter or both', 2)
-    end
-    return {type = 'property', getter = getter, setter = setter}
-  end
-
-  function Class.meta(value)
-    if rawequal(value, nil) then
-      error('meta must have a value', 2)
-    end
-    return {type = 'meta', value = value}
-  end
-
-  local class_field_initializers = {
-    field = function(cls, key, description)
-      if description.public then
-        cls.__public[key] = true
-      else
-        cls.__readonly[key] = true
-      end
-    end,
-
-    property = function(cls, key, description)
-      cls.__properties[key] = {
-        getter = description.getter,
-        setter = description.setter,
-      }
-    end,
-
-    meta = function(cls, key, description)
-      cls.__meta[key] = description.value
-    end,
-  }
-
-  local function class_len() error('classes do not support length operator', 2) end
-  local function class_ipairs() error('classes do not support ipairs()', 2) end
-  local function class_pairs() error('classes do not support pairs()', 2) end
-
-  local function class_newindex(self, key, _)
-    error('class ' .. repr(self.name) .. ' does not have key ' .. repr(key) .. ' to set', 2)
-  end
-
-  local function class_tostring(cls)
-    return '<class ' .. repr(cls.__name) .. '>'
-  end
-
-  local function new_instance(cls, ...)
-    local self = {
-      __class = cls,
-      __values = {},
-    }
-    setmetatable(self, cls.__meta)
-    cls.__init(self, ...)
-    return self
-  end
-
-  local function instance_len(self)
-    error(self.__class.__name .. ' instances do not support length operator', 2)
-  end
-
-  local function instance_newindex(self, key, value)
-    newindex(self, self.__class, key, value)
-  end
-
-  local function instance_index(self, key)
-    return index(self, self.__class, key)
-  end
-
-  local function instance_ipairs(self)
-    error(self.__class.__name .. ' instances do not support ipairs()', 2)
-  end
-
-  local function instance_pairs(self)
-    error(self.__class.__name .. ' instances do not support pairs()', 2)
-  end
-
-  local subclass
-  local function empty_function() end
-
   local class_indexers = {
     '__public',
     '__readonly',
@@ -255,6 +252,8 @@ function InitClassPackage(common)
     '__cls',
   })
 
+  local subclass
+  local function empty_function() end
   local interface_prepare_class_deftable
 
   local function create_class(name, deftable, ...)
@@ -313,7 +312,7 @@ function InitClassPackage(common)
       __ipairs = class_ipairs,
       __pairs = class_pairs,
       __tostring = class_tostring,
-      __call = new_instance,
+      __call = class_new_instance,
       __metatable = true,
     }
 
@@ -322,8 +321,8 @@ function InitClassPackage(common)
         init = v
       elseif special_fields[k] then
         error('field name ' .. repr(k) .. ' is prohibited to use inside a class', 3)
-      elseif type(v) == 'table' and class_field_initializers[v.type] then
-        class_field_initializers[v.type](class, k, v)
+      elseif type(v) == 'table' and class_key_initializers[v.type] then
+        class_key_initializers[v.type](class, k, v)
       else
         class[k] = v
       end
@@ -358,7 +357,7 @@ function InitClassPackage(common)
     end
 
     class.__init = init
-    class.new = new_instance
+    class.new = class_new_instance
     class.__meta = ins_meta
     class.subclass = subclass
     class.__sub_metas = sub_metas
