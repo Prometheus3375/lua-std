@@ -45,7 +45,7 @@ function InitClassPackage(common)
   function Interface.GetNames(as_set) return get_names(interface_names, as_set) end
   --endregion
 
-  --region Class variables
+  --region Classes and instances
   --region Field definitions
   local known_field_definitions = setmetatable({}, __meta_weak_keys)
   local function is_field_definition(v) return known_field_definitions[v] or false end
@@ -158,30 +158,6 @@ function InitClassPackage(common)
 
   local function to_string(self, cls)
     return string.format('<%s instance at 0x%016X>', cls.__name, self.__id)
-  end
-  --endregion
-
-  --region Class functions
-  local function class_len() error('classes do not support length operator', 2) end
-  local function class_pairs() error('classes do not support pairs()', 2) end
-
-  local function class_newindex(self, key, _)
-    error('class ' .. repr(self.name) .. ' does not have key ' .. repr(key) .. ' to set', 2)
-  end
-
-  local function class_tostring(cls)
-    return '<class ' .. repr(cls.__name) .. '>'
-  end
-
-  local function class_new_instance(cls, ...)
-    local self = {
-      __class = cls,
-      __values = {},
-    }
-    self.__id = table_address(self)
-    setmetatable(self, cls.__meta)
-    cls.__init(self, ...)
-    return self
   end
   --endregion
 
@@ -307,11 +283,29 @@ function InitClassPackage(common)
   end
   --endregion
 
-  local class_indexers = {
-    '__public',
-    '__readonly',
-    '__properties',
-  }
+  --region Class
+  local class_meta = {__metatable = true}
+
+  function class_meta.__len() error('classes do not support length operator', 2) end
+
+  function class_meta.__newindex(cls, key, _)
+    error('class ' .. repr(cls.__name) .. ' does not have key ' .. repr(key) .. ' to set', 2)
+  end
+
+  function class_meta.__tostring(cls)
+    return '<class ' .. repr(cls.__name) .. '>'
+  end
+
+  function class_meta.__call(cls, ...)
+    local self = {
+      __class = cls,
+      __values = {},
+    }
+    self.__id = table_address(self)
+    setmetatable(self, cls.__meta)
+    cls.__init(self, ...)
+    return self
+  end
 
   local prohibited_keys = common.set.from_array({
     -- instance keys
@@ -327,7 +321,6 @@ function InitClassPackage(common)
     '__superclasses',
     '__interfaces',
     '__subclasses',
-    '__sub_metas',
     '__meta',
     -- meta keys for instances
     '__newindex',
@@ -343,8 +336,15 @@ function InitClassPackage(common)
     __set_numeric_key = 'function',
   }
 
+  local class_indexers = {
+    '__public',
+    '__readonly',
+    '__properties',
+    '__meta',
+  }
+
   local function empty_function() end
-  local interface_prepare_class_deftable
+  local interface_init_class
 
   local function create_class(name, deftable, ...)
     --region Check arguments
@@ -391,10 +391,6 @@ function InitClassPackage(common)
     end
     --endregion
 
-    for _, itf in ipairs(parent_interfaces) do
-      interface_prepare_class_deftable(itf, deftable, parent_class)
-    end
-
     local class = {
       __name = name,
       -- indexers
@@ -405,7 +401,6 @@ function InitClassPackage(common)
       __superclasses = {}, -- all ancestors, a set
       __interfaces = {}, -- all implemented interfaces, a set; may change over time
       __subclasses = {}, -- only direct descendants, an array
-      __sub_metas = {}, -- metatables for indexers of direct descendants
       -- own instances
       __init = empty_function,
       __meta = {
@@ -419,16 +414,8 @@ function InitClassPackage(common)
       },
     }
     class.__id = table_address(class)
-    -- todo make global
-    local cls_meta = {
-      __len = class_len,
-      __newindex = class_newindex,
-      __pairs = class_pairs,
-      __tostring = class_tostring,
-      __call = class_new_instance,
-      __metatable = true,
-    }
 
+    -- Apply deftable
     for k, v in pairs(deftable) do
       if is_field_definition(v) then
         class_key_initializers[v.type](class, k, v)
@@ -437,19 +424,16 @@ function InitClassPackage(common)
       end
     end
 
-    for _, indexer in ipairs(class_indexers) do
-      class.__sub_metas[indexer] = {__index = class[indexer]}
-    end
-
+    -- Apply interfaces
     local class_interfaces = class.__interfaces
     for _, itf in ipairs(parent_interfaces) do
+      interface_init_class(itf, class, parent_class)
       class_interfaces[itf] = true
       set_union(class_interfaces, itf.__all_ancestors)
     end
 
-    local ins_meta = class.__meta
+    -- Apply superclass
     if parent_class then
-
       class.__superclass = parent_class
       table.insert(parent_class.__subclasses, class)
 
@@ -457,22 +441,33 @@ function InitClassPackage(common)
       set_union(class.__superclasses, parent_class.__superclasses)
       set_union(class_interfaces, parent_class.__interfaces)
 
-      -- todo copy missing values instead of adding __index
-      for _, indexer in ipairs(class_indexers) do
-        setmetatable(class[indexer], parent_class.__sub_metas[indexer])
+      -- Copy missing indexers from superclass
+      for _, idx_key in ipairs(class_indexers) do
+        local own = class[idx_key]
+
+        for k, v in pairs(parent_class[idx_key]) do
+          if own[k] == nil then
+            own[k] = v
+          end
+        end
+
       end
-      for metaname, metamethod in pairs(parent_class.__meta) do
-        if not ins_meta[metaname] then
-          ins_meta[metaname] = metamethod
+
+      -- Copy missing attributes from superclass
+      for k, v in pairs(parent_class) do
+        if class[k] == nil then
+          class[k] = v
         end
       end
-      cls_meta.__index = parent_class
 
+      -- Take ancestor's init if no own init
       if class.__init == empty_function then
         class.__init = parent_class.__init
       end
     end
 
+    -- Convert None-ed metamethods to nil
+    local ins_meta = class.__meta
     for metaname, metamethod in pairs(ins_meta) do
       if isNone(metamethod) then
         ins_meta[metaname] = nil
@@ -481,20 +476,21 @@ function InitClassPackage(common)
 
     -- todo add hash check
     -- if class does not have __meta.__eq and __hash, add basic hash based on address
-    -- if class has __meta.__eq and __hash is None, set __hash to nil?
+    -- if class has __meta.__eq and __hash is None, set __hash to nil
     -- do nothing if class has __meta.__eq and not __hash, has __hash and not __meta.__eq or has both.
 
     known_classes[class] = true
     class_names[name] = class
-    return setmetatable(class, cls_meta)
+    return setmetatable(class, class_meta)
   end
+  --endregion
 
   local package_class_meta = gen_pack_meta('Class')
   function package_class_meta.__call(_, ...) return create_class(...) end
   setmetatable(Class, package_class_meta)
   --endregion
 
-  --region Interface variables
+  --region Interfaces
   --region Methods
   local signature_meta = gen_meta('signatures', true)
   signature_meta.__metatable = signature_meta
@@ -635,18 +631,15 @@ function InitClassPackage(common)
     return false
   end
 
-  local Class_meta = Class.meta
-
-  -- todo pass class?
-  function interface_prepare_class_deftable(self, class_deftable, class_parent)
-    class_parent = class_parent or {__meta = {}}
+  function interface_init_class(self, cls, supercls)
+    supercls = supercls or {__meta = {}}
 
     for m_name, m_table in pairs(self.__usual_methods) do
-      local method = class_deftable[m_name] or class_parent[m_name]
+      local method = toNil(cls[m_name] or supercls[m_name])
 
       if m_table.does_not_implement(method) then
         if m_table.default then
-          class_deftable[m_name] = m_table.default
+          cls[m_name] = m_table.default
         else
           error('any descendant of interface ' .. repr(self.__name) .. ' must implement '
             .. m_name .. signature_as_string(m_table.signature), 4)
@@ -655,18 +648,11 @@ function InitClassPackage(common)
     end
 
     for m_name, m_table in pairs(self.__metamethods) do
-      local meta_field = class_deftable[m_name]
-      local method
-
-      if meta_field == nil then
-        method = class_parent.__meta[m_name]
-      else
-        method = toNil(meta_field.value)
-      end
+      local method = toNil(cls.__meta[m_name] or supercls.__meta[m_name])
 
       if m_table.does_not_implement(method) then
         if m_table.default then
-          class_deftable[m_name] = Class_meta(m_table.default)
+          cls[m_name] = m_table.default
         else
           error('any descendant of interface ' .. repr(self.__name) .. ' must implement metamethod '
             .. m_name .. signature_as_string(m_table.signature), 4)
