@@ -1,6 +1,17 @@
-dofile('library/init.lua')
+PLSL = require('library')
+local common = PLSL.common
+local Class = PLSL.Class
 
-function test_class()
+local issubclass = common.issubclass
+local isinstance = common.isinstance
+
+local super = Class.super
+
+local Field = Class.field
+local Property = Class.property
+local Meta = Class.meta
+
+local function test_class()
   local Animal = {
     name = Field(),
     public_name = Field(true),
@@ -24,7 +35,7 @@ function test_class()
   animal:print()
 end
 
-function test_inheritance()
+local function test_inheritance()
   local Animal = {
     name = Field(),
   }
@@ -61,21 +72,6 @@ function test_inheritance()
   mammal:feed()
 end
 
-do
-  InitPLSL('library')
-  common = PLSL.common
-  Class = PLSL.Class
-
-  issubclass = common.issubclass
-  isinstance = common.isinstance
-
-  super = Class.super
-
-  Field = Class.field
-  Property = Class.property
-  Meta = Class.meta
-
-  test_class()
-  collectgarbage()
-  test_inheritance()
-end
+test_class()
+collectgarbage()
+test_inheritance()
