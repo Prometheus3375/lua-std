@@ -139,6 +139,7 @@ do
 
   --region enumerate
   local enumerate = {}
+
   function enumerate:__init(iterable, start)
     if start ~= nil and type(start) ~= 'number' then
       error('start must be a number or nil, got ' .. type_repr(start), 3)
