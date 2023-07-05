@@ -44,13 +44,13 @@ function InitCommonPackage()
   end
 
   function common.generate_protected_metatable(name, plural)
-    local name_do = name .. (plural and ' do ' or ' does ') .. 'not support '
+    local name_do = name .. (plural and ' do not ' or ' does not ')
     return {
-      __len = function() error(name_do .. 'length operator', 2) end,
-      __index = function() error(name_do .. 'index getting', 2) end,
-      __newindex = function() error(name_do .. 'index setting', 2) end,
-      __ipairs = function() error(name_do .. 'ipairs()', 2) end,
-      __pairs = function() error(name_do .. 'pairs()', 2) end,
+      __len = function() error(name_do .. 'support length operator', 2) end,
+      __index = function(_, key) error(name_do .. 'have key ' .. repr(key), 2) end,
+      __newindex = function(_, key, _) error(name_do .. 'have key ' .. repr(key) .. ' to set', 2) end,
+      __ipairs = function() error(name_do .. 'support ipairs()', 2) end,
+      __pairs = function() error(name_do .. 'support pairs()', 2) end,
       __metatable = true,
     }
   end
