@@ -210,7 +210,10 @@ function InitClasses()
             __subs = {},
         }
         local init = empty_func
-        local meta = {__tostring = class_tostring}
+        local meta = {
+            __tostring = class_tostring,
+            __call = new_instance,
+        }
         local supers = {}
         
         
