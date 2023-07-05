@@ -162,7 +162,6 @@ function InitCommonPackage()
       __len = function() error(name_do .. 'support length operator', 2) end,
       __index = function(_, key) error(name_do .. 'have key ' .. repr(key), 2) end,
       __newindex = function(_, key, _) error(name_do .. 'have key ' .. repr(key) .. ' to set', 2) end,
-      __ipairs = function() error(name_do .. 'support ipairs()', 2) end,
       __pairs = function() error(name_do .. 'support pairs()', 2) end,
       __metatable = true,
     }
