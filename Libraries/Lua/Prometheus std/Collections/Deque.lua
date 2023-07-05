@@ -63,6 +63,8 @@ function InitDeque()
         __tostring = Class.meta(node_tostring),
     })
     
+    -- todo: create iterator object
+    
     local list_AppendNode
     
     local function init_list(self, ...)
