@@ -1,4 +1,4 @@
-dofile('../Common.lua')
+dofile('Library/Common.lua')
 
 do
     local test = {}
