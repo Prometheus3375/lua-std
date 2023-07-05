@@ -4,7 +4,7 @@ function InitClasses()
     local function set(array)
         local s = {}
         for i, v in ipairs(array) do
-            s[v] = 0
+            s[v] = true
         end
         return s
     end
@@ -58,12 +58,14 @@ function InitClasses()
     local function newindex(self, cls, key, value)
         -- fallback for nil public fields
         if cls.__public[key] then
-            return rawset(self, key, value)
+            rawset(self, key, value)
+            return
         end
         -- setters
         local value = cls.__properties[key]
         if value then
-            return value.setter(self, value)
+            value.setter(self, value)
+            return
         end
         
         error('instance of type ' .. cls.__name .. ' does not have settable key \'' .. key .. '\'')
@@ -116,7 +118,7 @@ function InitClasses()
     end
     
     
-    super_meta = {
+    local super_meta = {
         __newindex = function (self, key, value)
             newindex(self.__ins, self.__cls, key, value)
         end,
@@ -146,9 +148,9 @@ function InitClasses()
     local add = {
         field = function (class, key, description)
             if description.public then
-                class.__public[key] = 0
+                class.__public[key] = true
             else
-                class.__readonly[key] = 0
+                class.__readonly[key] = true
             end
         end,
         
@@ -208,6 +210,7 @@ function InitClasses()
             __meta = {
                 __newindex = instance_newindex,
                 __index = instance_index,
+                -- todo: add defult ipairs and pairs which throw an error
             },
             __subs = {},
         }
@@ -234,9 +237,9 @@ function InitClasses()
             class.super = parent
             table.insert(parent.__subs, class)
             
-            supers[parent] = 0
+            supers[parent] = true
             for p, _ in pairs(parent.__supers) do
-                supers[p] = 0
+                supers[p] = true
             end
             
             for i, k in ipairs(indexers) do
@@ -254,10 +257,7 @@ function InitClasses()
         class.subclass = subclass
         class.__supers = supers
         
-        setmetatable(class, meta)
-        
-        
-        return class
+        return setmetatable(class, meta)
     end
     
     subclass = function (parent, name, deftable)
