@@ -257,7 +257,7 @@ function InitClassPackage(common)
     --endregion
 
     for _, itf in ipairs(parent_interfaces) do
-      itf:PrepareClassDeftable(deftable, parent_class)
+      itf:PrepareClassDeftable(deftable, parent_class, 4)
     end
 
     local class = {
@@ -342,7 +342,17 @@ function InitClassPackage(common)
   method_meta.__index = {}
 
   function method_meta.__tostring(self)
+    if self.is_metamethod then
+      return 'interface metamethod ' .. self.name .. self.signature
+    end
+
     return 'interface method ' .. self.name .. self.signature
+  end
+
+  function method_meta.__eq(self, other)
+    return self.name == other.name
+      and self.signature == other.signature
+      and self.is_metamethod == other.is_metamethod
   end
 
   function method_meta.__index:WithDefault(default)
@@ -370,68 +380,74 @@ function InitClassPackage(common)
   function interface_meta.__tostring(self) return '<interface ' .. repr(self.__name) .. '>' end
   interface_meta.__index = {}
 
-  function interface_meta.__index:Register(cls)
+  function interface_meta.__index:Register(cls, err_level)
     if not isclass(cls) then
-      error('only classes can be registered, got ' .. repr(cls), 2)
+      error('only classes can be registered, got ' .. repr(cls), err_level or 2)
     end
 
     self.__registered[cls] = true
-    for _, p in ipairs(self.__all_supers_array) do
-      self.__registered[p] = true
+    for p, _ in pairs(self.__all_supers) do
+      p.__registered[cls] = true
     end
   end
 
-  function interface_meta.__index:IsRegistered(cls)
+  function interface_meta.__index:HasRegistered(cls)
     return self.__registered[cls] or false
   end
 
-  function interface_meta.__index:PrepareClassDeftable(class_deftable, class_parent)
+  function interface_meta.__index:IsDescendantOf(itf)
+    if rawequal(self, itf) then
+      return true
+    end
+
+    return self.__all_supers[itf] or false
+  end
+
+  function interface_meta.__index:PrepareClassDeftable(class_deftable, class_parent, err_level)
     class_parent = class_parent or {__meta = {}}
+    err_level = err_level or 2
 
-    for _, m_table in ipairs(self.__methods) do
+    for _, m_table in ipairs(self.__simple_methods) do
       local m_name = m_table.name
-      if m_table.is_metamethod then
-        local meta_field = class_deftable[m_name]
-        local method
+      local method = class_deftable[m_name] or class_parent[m_name]
 
-        if rawequal(meta_field, nil) then
-          method = class_parent.__meta[m_name]
+      if rawequal(method, nil) then
+        if m_table.default then
+          class_deftable[m_name] = m_table.default
         else
-          method = meta_field.value
+          error('any descendant of ' .. self.__name .. ' must implement '
+            .. m_name .. m_table.signature, err_level)
         end
-
-        if rawequal(method, nil) then
-          if m_table.default then
-            class_deftable[m_name] = Class.meta(m_table.default)
-          else
-            error('any descendant of ' .. self.__name .. ' must implement metamethod '
-              .. m_name .. m_table.signature, 2)
-          end
-        elseif type(method) ~= 'function' then
-          error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
-            ' as a metamethod with signature ' .. m_table.signature, 2)
-        end
-      else
-        local method = class_deftable[m_name] or class_parent[m_name]
-
-        if rawequal(method, nil) then
-          if m_table.default then
-            class_deftable[m_name] = m_table.default
-          else
-            error('any descendant of ' .. self.__name .. ' must implement '
-              .. m_name .. m_table.signature, 2)
-          end
-        elseif type(method) ~= 'function' then
-          error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
-            ' as a function with signature ' .. m_table.signature, 2)
-        end
-
+      elseif type(method) ~= 'function' then
+        error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
+          ' as a function with signature ' .. m_table.signature, err_level)
       end
     end
 
-    for _, p in ipairs(self.__all_supers_array) do
-      p:PrepareClassDeftable(class_deftable, class_parent)
+    for _, m_table in ipairs(self.__meta_methods) do
+      local m_name = m_table.name
+      local meta_field = class_deftable[m_name]
+      local method
+
+      if rawequal(meta_field, nil) then
+        method = class_parent.__meta[m_name]
+      else
+        method = meta_field.value
+      end
+
+      if rawequal(method, nil) then
+        if m_table.default then
+          class_deftable[m_name] = Class.meta(m_table.default)
+        else
+          error('any descendant of ' .. self.__name .. ' must implement metamethod '
+            .. m_name .. m_table.signature, 2)
+        end
+      elseif type(method) ~= 'function' then
+        error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
+          ' as a metamethod with signature ' .. m_table.signature, 2)
+      end
     end
+
   end
 
   local interface_names = setmetatable({}, __meta_weak_values)
@@ -439,44 +455,86 @@ function InitClassPackage(common)
   function Interface.GetByName(name) return interface_names[name] end
 
   local function define_interface(name, methods, ...)
+    --region Check arguments
     if interface_names[name] then
       error('name ' .. repr(name) .. ' is already in use', 3)
     end
 
-    local passed_parents = {...}
+    local passed_parents = table.pack(...)
+    local parents = {}
+    for i = 1, passed_parents.n do
+      local p = passed_parents[i]
+      if isinterface(p) then
+        table.insert(parents, p)
+      else
+        error('only interfaces can be ancestors of an interface, '
+          .. number2index(i) .. ' passed ancestor is ' .. repr(p), 3)
+      end
+    end
+    --endregion
+
+    local simple = {
+      methods = {},
+      name2method = {},
+      name2interface = {},
+    }
+    local meta = {
+      methods = {},
+      name2method = {},
+      name2interface = {},
+    }
+    for _, m_table in ipairs(methods) do
+      local t = m_table.is_metamethod and meta or simple
+      table.insert(t.methods, m_table)
+      t.name2method[m_table.name] = m_table
+      t.name2interface[m_table.name] = name
+    end
+
     local supers_set = {}
-    local supers_array = {}
 
-    for i, p in ipairs(passed_parents) do
-      if not isinterface(p) then
-        error(
-          'only interfaces can be ancestors of an interface, '
-            .. number2index(i) .. ' passed ancestor is not an interface',
-          3
-        )
-      end
+    for _, p in ipairs(parents) do
+      --region Get methods from parents
+      local own_tables = {simple, meta}
+      local p_tables = {p.__simple_methods, p.__meta_methods}
 
-      if not supers_set[p] then
-        table.insert(supers_array, p)
-        supers_set[p] = true
-      end
+      for i = 1, 2 do
+        local t, pt = own_tables[i], p_tables[i]
 
-      for _, pp in ipairs(p.__all_supers_array) do
-        if not supers_set[pp] then
-          table.insert(supers_array, pp)
-          supers_set[pp] = true
+        for _, m_table in ipairs(pt) do
+          local m_name = m_table.name
+          local own_m_table = t.name2method[m_name]
+
+          if own_m_table then
+            if own_m_table ~= m_table then
+              error(tostring(own_m_table) .. ' from ' .. t.name2interface[m_name]
+                .. ' conflicts with ' .. tostring(m_table) .. ' from ' .. p.__name, 3)
+            end
+          else
+            table.insert(t.methods, m_table)
+            t.name2method[m_name] = m_table
+            t.name2interface[m_name] = p.__name
+          end
         end
+
       end
+      --endregion
+
+      --region Fill set of supers
+      supers_set[p] = true
+      for pp, _ in pairs(p.__all_supers) do
+        supers_set[pp] = true
+      end
+      --endregion
 
     end
 
     local result = setmetatable({
       __name = name,
       __registered = setmetatable({}, __meta_weak_keys),
-      __methods = methods,
-      __all_supers_set = supers_set,
-      __all_supers_array = supers_array,
-      __direct_supers = passed_parents,
+      __simple_methods = simple.methods,
+      __meta_methods = meta.methods,
+      __all_supers = supers_set,
+      __direct_supers = parents,
     }, interface_meta)
 
     known_interfaces[result] = true
@@ -520,7 +578,7 @@ function InitClassPackage(common)
       end
 
       for _, other in ipairs(interfaces) do
-        if other:IsRegistered(value) then
+        if other:HasRegistered(value) then
           return true
         end
       end
@@ -530,7 +588,7 @@ function InitClassPackage(common)
 
     if isinterface(value) then
       for _, other in ipairs(interfaces) do
-        if rawequal(value, other) or value.__all_supers_set[other] then
+        if value:IsDescendantOf(other) then
           return true
         end
       end
