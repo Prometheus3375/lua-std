@@ -42,10 +42,10 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
-  -- todo add flag allow_numeric_indexes and keys for special functions to get and set them
-  -- todo consider allowing using numeric indexes directly in self
-  -- if yes, in create_class after parent_class is processed replace any None in meta with nil
-  -- todo remove default __ipairs, ipairs() uses __index by default
+  -- todo add special fields __get_numeric_key and __set_numeric_key
+  -- todo allow using numeric indexes directly in self
+  -- in create_class after parent_class is processed replace any None in meta with nil
+  -- todo remove default __ipairs for instances, ipairs() uses __index by default
   local known_indexers = setmetatable({}, __meta_weak_keys)
   local function is_indexer(v) return known_indexers[v] or false end
 
@@ -447,8 +447,13 @@ function InitClassPackage(common)
   --endregion
 
   --region Interface variables
+  -- todo rework Interfaces
+  -- make them accept tables name - value where each value is a table of format
+  -- {value, check_class, check_interface}
+  -- value can be a Value or a Method
+  -- check_class and check_interface are function that take 2 args and compares them
+  -- if the result is true, other class/interface is a valid descendant
   --region Methods
-
   -- todo add Signature object
   -- signatures are equal when one of them have vararg. Otherwise, number of arguments must be equal
   local method_meta = gen_meta('interface methods', true)
@@ -483,7 +488,7 @@ function InitClassPackage(common)
 
   function Interface.DefineMethod(name, signature, is_metamethod)
     -- todo check that name is a string and not in prohibited_keys
-    -- todo check that signature is string
+    -- todo check that signature is a string
     return setmetatable({
       name = name,
       signature = signature,

@@ -27,6 +27,8 @@ function ExtendCommonPackage(common, Class, CB)
     if isinstance(ins, Iterable) then
       return ins:__iter()
     end
+    -- todo add support for SupportsItemGet
+    -- todo add support for arrays
 
     type_error(ins, 'is not an iterable', err_level + 1)
   end
@@ -48,6 +50,9 @@ function ExtendCommonPackage(common, Class, CB)
       end
       return result
     end
+
+    -- todo add support for SupportsItemGet
+    -- todo add support for arrays
 
     type_error(ins, 'cannot be represented as an array', 2)
   end
