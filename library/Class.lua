@@ -372,7 +372,7 @@ function InitClassPackage(common)
 
   function interface_meta.__index:Register(cls)
     if not isclass(cls) then
-      error('only classes can be registered', 2)
+      error('only classes can be registered, got ' .. repr(cls), 2)
     end
 
     self.__registered[cls] = true
