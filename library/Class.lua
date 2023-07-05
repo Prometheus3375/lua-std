@@ -185,7 +185,7 @@ function InitClassPackage(common)
 
   function Class.tostring(ins)
     local meta = ins.__class.__meta
-    local str = rawget(meta, '__tostring')
+    local str = meta.__tostring
     if str then
       meta.__tostring = nil
       local result = tostring(ins)
@@ -199,20 +199,20 @@ function InitClassPackage(common)
   --region super
   local super_meta = {__metatable = true}
 
-  -- If superclass does not have __len, but the class of instance has,
-  -- then the error states that class of instance does not have __len.
-  -- Thus, checks are added to __len and __pairs to emit correct errors.
   function super_meta:__len()
     local len = self.__class.__meta.__len
+
+    -- Raise correct error if superclass uses default value
     if len == instance_len then
       error(repr(self.__class.__name) .. ' instance does not support length operator', 2)
     end
 
-    -- fallback if superclass does not have __len, but own class has
+    -- Fallback if superclass does not have __len
     if len == nil then
       local meta = self.__ins.__class.__meta
-      if meta then
-        len = meta.__len
+      len = meta.__len
+      if len then
+        meta.__len = nil
         local result = #self.__ins
         meta.__len = len
         return result
@@ -233,17 +233,21 @@ function InitClassPackage(common)
 
   function super_meta:__pairs()
     local pairs = self.__class.__meta.__pairs
+
+    -- Raise correct error if superclass uses default value
     if pairs == instance_pairs then
       error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
     end
 
-    -- fallback if superclass does not have __len, but own class has
+    -- Fallback if superclass does not have __pairs
     if pairs == nil then
       return next, self.__ins, nil
     end
 
     return pairs(self.__ins)
   end
+
+  -- todo add support for all metamethods to super
 
   -- super object must have a string representation for debugging
   -- Thus, it is not possible to use superclass' __tostring
@@ -833,7 +837,7 @@ function InitClassPackage(common)
   end
 
   local function isinstance(ins, ...)
-    if type(ins) == 'table' and isclass(ins.__class) then
+    if type(ins) == 'table' and isclass(rawget(ins, '__class')) then
       local classes, interfaces = issubclass_get_supers(...)
       if #classes == 0 and #interfaces == 0 then
         return true
