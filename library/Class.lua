@@ -210,6 +210,20 @@ function InitClasses(common)
     '__cls',
   })
 
+  local default_instance_meta = {
+    __len = function(self)
+      error(self.__class.__name .. ' instances do not support length operator', 2)
+    end,
+    __ipairs = function(self)
+      error(self.__class.__name .. ' instances do not support ipairs()', 2)
+    end,
+    __pairs = function(self)
+      error(self.__class.__name .. ' instances do not support pairs()', 2)
+    end,
+  }
+
+  local default_meta_of_instance_meta = {__index = default_instance_meta}
+
   local class_names = setmetatable({}, __meta_weak_values)
 
   function Class.GetByName(name) return class_names[name] end
@@ -244,16 +258,17 @@ function InitClasses(common)
       itf:PrepareClassDeftable(deftable)
     end
 
-    local ins_meta = gen_meta(name .. ' instances', true)
-    ins_meta.__index = instance_index
-    ins_meta.__newindex = instance_newindex
-    ins_meta.__name = name .. ' instance'
     local class = {
       __name = name,
       __public = {},
       __readonly = {},
       __properties = {},
-      __meta = ins_meta,
+      __meta = setmetatable({
+        __index = instance_index,
+        __newindex = instance_newindex,
+        __name = name .. ' instance',
+        __metatable = true,
+      }, default_meta_of_instance_meta),
       __subs = {},
     }
     local init = empty_function
