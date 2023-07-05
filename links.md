@@ -1,0 +1,4 @@
+- [Lua 5.3 manual](https://www.lua.org/manual/5.3/contents.html#contents)
+- [Python abstract collections](https://docs.python.org/3/library/collections.abc.html#collections-abstract-base-classes)
+- [printf specifiers](https://www.tutorialspoint.com/c_standard_library/c_function_printf.htm)
+- [TS2Lua playground](https://typescripttolua.github.io/play/#code/PTAEBEFMGMBsEMBOlSQB4AcD2BnSATUAQQAUBJAKABcBPDFANRiq0VAF5QBtAOwFcAtgCNIiADSh+w0RKkjEAXQDcFCvhgJkoAGZ8e0KgEssPHYZ74Aqj0NUcZHgCV4+Q3xwAKKgAtDOAFygAG5YhvgS0JA8VKKBTAasEogubgGSgvIAlIHWtlzKahpIKOYxiNrwkaC5VKAA3hSgTaB+AKI8kAI0Hlg+sdU2VNmgQlhYsJDwPCrNoADWhrCwHsMhYSoAvqoUINV4oOpwxYSkZC2m0FjqFLr6RiagJkRCi7Y0AMLwOFRevmlr4VA0C+ZRygwkVCQAHNIFQADJYYH3HhxZisTL1RrNS48b6gPS2HAcMwWGr2JwpdxeaGwhFI4w8CQAVgADCzMjNsSY8VFOoZIETOAS7AA6bSLMoeYUcAB8QJBohFbQ6XSlg0yHNUs20rFAHhxPJVNEe2lQKv5OAxDVms15XRFCyWK05TS2WKaE1qgskkAA7qAAMqw53u0Ceg7Ejr+gCy8AwIdm4aCxK4AEYJAAmAqh-AivA-IISVOarZAA)
