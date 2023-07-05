@@ -2,6 +2,13 @@ function InitClassPackage(common)
   --region Initialization
   common = common or _ENV.common or _ENV.Common
 
+  local repr = common.repr
+  local number2index = common.number2index
+  local set_union = common.set_union
+  local set2array = common.set2array
+  local gen_meta = common.generate_protected_metatable
+  local gen_pack_meta = common.generate_package_metatable
+
   local __meta_weak_keys = {__mode = 'k'}
   local __meta_weak_values = {__mode = 'v'}
 
@@ -18,17 +25,12 @@ function InitClassPackage(common)
   local interface_names = setmetatable({}, __meta_weak_values)
 
   local function get_names(t, as_set)
-    local result = {}
     if as_set then
-      for name, _ in pairs(t) do
-        result[name] = true
-      end
-    else
-      for name, _ in pairs(t) do
-        table.insert(result, name)
-      end
-      table.sort(result)
+      return set_union({}, t)
     end
+
+    local result = set2array(t)
+    table.sort(result)
     return result
   end
 
@@ -36,11 +38,6 @@ function InitClassPackage(common)
   function Class.GetNames(as_set) return get_names(class_names, as_set) end
   function Interface.GetByName(name) return interface_names[name] end
   function Interface.GetNames(as_set) return get_names(interface_names, as_set) end
-
-  local repr = common.repr
-  local number2index = common.number2index
-  local gen_meta = common.generate_protected_metatable
-  local gen_pack_meta = common.generate_package_metatable
   --endregion
 
   --region Class variables
@@ -238,13 +235,13 @@ function InitClassPackage(common)
     return '<super: ' .. tostring(self.__class) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
   end
 
-  local function super_check_parent(cls, parent)
+  local function super_get_parent(cls, parent)
     if isclass(parent) then
-      if not cls.__supers[parent] then
+      if not cls.__superclasses[parent] then
         error('class ' .. repr(cls.__name) .. ' does not have superclass ' .. repr(parent.__name), 3)
       end
     elseif parent == nil then
-      parent = cls.super
+      parent = cls.__superclass
       if parent == nil then
         error('class ' .. repr(cls.__name) .. ' does not have a superclass', 3)
       end
@@ -256,14 +253,14 @@ function InitClassPackage(common)
   end
 
   function Class.super(ins, parent)
-    parent = super_check_parent(ins.__class, parent)
+    parent = super_get_parent(ins.__class, parent)
     return setmetatable({__ins = ins, __class = parent}, super_meta)
   end
 
   local addressof = Class.addressof
 
   function Class.super_tostring(ins, parent)
-    parent = super_check_parent(ins.__class, parent)
+    parent = super_get_parent(ins.__class, parent)
     local meta = parent.__meta
     local str = meta.__tostring
     if str then return str(ins) end
@@ -277,7 +274,7 @@ function InitClassPackage(common)
     '__properties',
   }
 
-  local prohibited_keys = common.set({
+  local prohibited_keys = common.array2set({
     -- instance keys
     '__class',
     '__values',
@@ -286,13 +283,14 @@ function InitClassPackage(common)
     '__public',
     '__readonly',
     '__properties',
+    'subclass',
+    '__superclass',
+    '__superclasses',
+    '__interfaces',
+    '__subclasses',
+    '__sub_metas',
     '__meta',
     '__init',
-    'subclass',
-    '__subs',
-    '__sub_metas',
-    'super',
-    '__supers',
     -- meta keys for instances
     '__newindex',
     '__index',
@@ -307,14 +305,23 @@ function InitClassPackage(common)
 
   local function create_class(name, deftable, ...)
     --region Check arguments
+    if type(name) ~= 'string' then
+      error('name must be a string, got ' .. repr(name) .. ' of type ' .. type(name), 3)
+    end
+
     if class_names[name] then
       error('name ' .. repr(name) .. ' is already in use', 3)
+    end
+
+    if type(deftable) ~= 'table' then
+      error('definition table must be a table, got '
+        .. repr(deftable) .. ' of type ' .. type(deftable), 3)
     end
 
     for k, _ in pairs(deftable) do
       if type(k) ~= 'string' then
         error('only string keys are allowed to use inside a class, got '
-          .. tostring(k) .. ' of type \'' .. type(k) .. '\'', 3)
+          .. tostring(k) .. ' of type ' .. type(k), 3)
       elseif prohibited_keys[k] then
         error('key ' .. repr(k) .. ' is prohibited to use inside a class', 3)
       end
@@ -347,23 +354,33 @@ function InitClassPackage(common)
 
     local class = {
       __name = name,
+      -- indexers
       __public = {},
       __readonly = {},
       __properties = {},
-      __subs = {},
+      -- inheritance
+      subclass = subclass,
+      __superclasses = {}, -- all ancestors, a set
+      __interfaces = {}, -- all implemented interfaces, a set; may change over time
+      __subclasses = {}, -- only direct descendants, an array
+      __sub_metas = {}, -- metatables for indexers of direct descendants
+      -- own instances
+      new = class_new_instance,
+      __meta = {
+        __len = instance_len,
+        __index = instance_index,
+        __newindex = instance_newindex,
+        __ipairs = instance_ipairs,
+        __pairs = instance_pairs,
+        __metatable = true,
+      },
     }
 
     local init = empty_function
-    local ins_meta = {
-      __len = instance_len,
-      __index = instance_index,
-      __newindex = instance_newindex,
-      __ipairs = instance_ipairs,
-      __pairs = instance_pairs,
-      __metatable = true,
-    }
-    local sub_metas = {}
-    local supers = {}
+    local ins_meta = class.__meta
+    local supers = class.__superclasses
+    local interfaces = class.__interfaces
+    local sub_metas = class.__sub_metas
     local cls_meta = {
       __len = class_len,
       __newindex = class_newindex,
@@ -384,18 +401,22 @@ function InitClassPackage(common)
       end
     end
 
-    for _, k in ipairs(class_indexers) do
-      sub_metas[k] = {__index = class[k]}
+    for _, indexer in ipairs(class_indexers) do
+      sub_metas[indexer] = {__index = class[indexer]}
+    end
+
+    for _, itf in ipairs(parent_interfaces) do
+      interfaces[itf] = true
+      set_union(interfaces, itf.__all_ancestors)
     end
 
     if parent_class then
-      class.super = parent_class
-      table.insert(parent_class.__subs, class)
+      class.__superclass = parent_class
+      table.insert(parent_class.__subclasses, class)
 
       supers[parent_class] = true
-      for p, _ in pairs(parent_class.__supers) do
-        supers[p] = true
-      end
+      set_union(supers, parent_class.__superclasses)
+      set_union(interfaces, parent_class.__interfaces)
 
       for _, indexer in ipairs(class_indexers) do
         setmetatable(class[indexer], parent_class.__sub_metas[indexer])
@@ -413,22 +434,14 @@ function InitClassPackage(common)
     end
 
     class.__init = init
-    class.new = class_new_instance
-    class.__meta = ins_meta
-    class.subclass = subclass
-    class.__sub_metas = sub_metas
-    class.__supers = supers
 
     known_classes[class] = true
     class_names[name] = class
-    for _, itf in ipairs(parent_interfaces) do
-      itf:Register(class)
-    end
     return setmetatable(class, cls_meta)
   end
 
-  subclass = function(parent, name, deftable, ...)
-    return create_class(name, deftable, parent, ...)
+  subclass = function(cls, name, deftable, ...)
+    return create_class(name, deftable, cls, ...)
   end
 
   local package_class_meta = gen_pack_meta('Class')
@@ -446,10 +459,10 @@ function InitClassPackage(common)
 
   function method_meta:__tostring()
     if self.is_metamethod then
-      return 'interface metamethod ' .. self.name .. self.signature
+      return '<interface metamethod ' .. self.name .. self.signature .. '>'
     end
 
-    return 'interface method ' .. self.name .. self.signature
+    return '<interface method ' .. self.name .. self.signature .. '>'
   end
 
   function method_meta:__eq(other)
@@ -482,25 +495,55 @@ function InitClassPackage(common)
 
   local interface_meta = gen_meta('interfaces', true)
   function interface_meta.__tostring(self) return '<interface ' .. repr(self.__name) .. '>' end
-  interface_meta.__index = {}
 
-  function interface_meta.__index:Register(cls)
-    if not isclass(cls) then
-      error('only classes can be registered, got ' .. repr(cls), 2)
+  local keys_of_method_tables = {'__simple_methods', '__meta_methods'}
+
+  local function interface_check_if_class_implements(self, cls)
+    if cls.__interfaces[self] then return true end
+
+    if self.__method_check_allowed then
+      for _, m_table in ipairs(self.__simple_methods) do
+        if type(cls[m_table.name]) ~= 'function' then
+          return false
+        end
+      end
+
+      for _, m_table in ipairs(self.__meta_methods) do
+        if type(cls.__meta[m_table.name]) ~= 'function' then
+          return false
+        end
+      end
+
+      cls.__interfaces[self] = true
+      return true
     end
 
-    self.__registered[cls] = true
-    for p, _ in pairs(self.__all_supers) do
-      p.__registered[cls] = true
+    return false
+  end
+
+  local function interface_check_if_other_implements(self, other)
+    if other.__all_ancestors[self] then return true end
+
+    if self.__method_check_allowed then
+      for _, key in ipairs(keys_of_method_tables) do
+        local name2method = {}
+        for _, m_table in ipairs(other[key]) do
+          name2method[m_table.name] = m_table
+        end
+
+        for _, m_table in ipairs(self[key]) do
+          if m_table ~= name2method[m_table.name] then
+            return false
+          end
+        end
+
+      end
+
+      other.__all_ancestors[self] = true
+      return true
     end
-  end
 
-  function interface_meta.__index:HasRegistered(cls)
-    return self.__registered[cls] or false
-  end
-
-  function interface_meta.__index:IsAncestorOf(itf)
-    return rawequal(self, itf) or (isinterface(itf) and itf.__all_supers[self] or false)
+    return false
   end
 
   local Class_meta = Class.meta
@@ -550,10 +593,19 @@ function InitClassPackage(common)
 
   end
 
-  local function define_interface(name, methods, ...)
+  local function define_interface(name, allow_method_check, methods, ...)
     --region Check arguments
+    if type(name) ~= 'string' then
+      error('name must be a string, got ' .. repr(name) .. ' of type ' .. type(name), 3)
+    end
+
     if interface_names[name] then
       error('name ' .. repr(name) .. ' is already in use', 3)
+    end
+
+    if type(methods) ~= 'table' then
+      error('method definition table must be a table, got '
+        .. repr(methods) .. ' of type ' .. type(methods), 3)
     end
 
     local passed_parents = table.pack(...)
@@ -586,15 +638,16 @@ function InitClassPackage(common)
       t.name2interface[m_table.name] = name
     end
 
-    local supers_set = {}
+    local ancestors = {}
 
+    local own_tables = {simple, meta}
+    local method_type = {'method ', 'metamethod '}
     for _, p in ipairs(parents) do
       --region Get methods from parents
-      local own_tables = {simple, meta}
       local p_tables = {p.__simple_methods, p.__meta_methods}
 
       for i = 1, 2 do
-        local t, pt = own_tables[i], p_tables[i]
+        local t, pt, typ = own_tables[i], p_tables[i], method_type[i]
 
         for _, m_table in ipairs(pt) do
           local m_name = m_table.name
@@ -602,8 +655,11 @@ function InitClassPackage(common)
 
           if own_m_table then
             if own_m_table ~= m_table then
-              error(tostring(own_m_table) .. ' from interface ' .. repr(t.name2interface[m_name])
-                .. ' conflicts with ' .. tostring(m_table) .. ' from interface ' .. repr(p.__name), 3)
+              error(typ .. m_name .. own_m_table.signature
+                .. ' from interface ' .. repr(t.name2interface[m_name]) .. ' conflicts with '
+                .. typ .. m_name .. m_table.signature
+                .. ' from interface ' .. repr(p.__name),
+                3)
             end
           else
             table.insert(t.methods, m_table)
@@ -616,21 +672,19 @@ function InitClassPackage(common)
       --endregion
 
       --region Fill set of supers
-      supers_set[p] = true
-      for pp, _ in pairs(p.__all_supers) do
-        supers_set[pp] = true
-      end
+      ancestors[p] = true
+      set_union(ancestors, p.__all_ancestors)
       --endregion
 
     end
 
     local result = setmetatable({
       __name = name,
-      __registered = setmetatable({}, __meta_weak_keys),
+      __method_check_allowed = allow_method_check and true or false,
       __simple_methods = simple.methods,
       __meta_methods = meta.methods,
-      __all_supers = supers_set,
-      __direct_supers = parents,
+      __all_ancestors = ancestors,
+      __direct_ancestors = parents,
     }, interface_meta)
 
     known_interfaces[result] = true
@@ -644,7 +698,7 @@ function InitClassPackage(common)
   --endregion
 
   --region Common variables
-  local function issubclass_inner(value, ...)
+  local function issubclass_get_supers(...)
     local supers = table.pack(...)
     local classes = {}
     local interfaces = {}
@@ -667,25 +721,35 @@ function InitClassPackage(common)
       end
     end
 
+    return classes, interfaces
+  end
+
+  local function issubclass_class_case(cls, classes, interfaces)
+    for _, other in ipairs(classes) do
+      if cls == other or cls.__superclasses[other] then
+        return true
+      end
+    end
+
+    for _, other in ipairs(interfaces) do
+      if interface_check_if_class_implements(other, cls) then
+        return true
+      end
+    end
+
+    return false
+  end
+
+  local function issubclass(value, ...)
+    local classes, interfaces = issubclass_get_supers(...)
+
     if isclass(value) then
-      for _, other in ipairs(classes) do
-        if value == other or value.__supers[other] then
-          return true
-        end
-      end
-
-      for _, other in ipairs(interfaces) do
-        if other:HasRegistered(value) then
-          return true
-        end
-      end
-
-      return false
+      return issubclass_class_case(value, classes, interfaces)
     end
 
     if isinterface(value) then
       for _, other in ipairs(interfaces) do
-        if other:IsAncestorOf(value) then
+        if value == other or interface_check_if_other_implements(other, value) then
           return true
         end
       end
@@ -696,13 +760,9 @@ function InitClassPackage(common)
     error('the first argument must be either a class or an interface, got ' .. repr(value), 3)
   end
 
-  local function issubclass(cls, ...)
-    return issubclass_inner(cls, ...)
-  end
-
   local function isinstance(ins, ...)
     if type(ins) == 'table' and isclass(ins.__class) then
-      return issubclass_inner(ins.__class, ...)
+      return issubclass_class_case(ins.__class, issubclass_get_supers(...))
     end
 
     return false
