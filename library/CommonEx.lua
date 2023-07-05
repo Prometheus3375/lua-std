@@ -16,6 +16,28 @@ function ExtendCommonPackage(common, Class, CB)
   local Iterator = CB.Iterator
   local Reversible = CB.Reversible
 
+  local iterator_wrapper = {}
+
+  function iterator_wrapper:__init(func, state, init_value)
+    local values = self.__values
+    values.func = func
+    values.state = state
+    values.v = init_value
+  end
+
+  function iterator_wrapper:__inext()
+    local values = self.__values
+    local var = values.func(values.state, values.v)
+    if var ~= nil then
+      values.v = var
+      return var
+    end
+
+    return nil
+  end
+
+  iterator_wrapper = Class('IteratorWrapper', iterator_wrapper, Iterator)
+
   local function type_error(ins, err, level)
     level = (level or 1) + 1
     if isinstance(ins) then
@@ -26,7 +48,18 @@ function ExtendCommonPackage(common, Class, CB)
 
   local function iter(ins, err_level)
     if isinstance(ins, Iterable) then
-      return ins:__iter()
+      local f, s, v = ins:__iter()
+
+      if isinstance(f, Iterator) then
+        return f
+      end
+
+      if type(f) == 'function' then
+        return iterator_wrapper(f, s, v)
+      else
+        error('first return value of __iter method must be an iterator instance or function, '
+          .. ins.__class.__name .. '.__iter() returned ' .. type_repr(f), (err_level or 1) + 1)
+      end
     end
     -- todo add support for SupportsItemGet
     -- todo add support for arrays
@@ -34,7 +67,7 @@ function ExtendCommonPackage(common, Class, CB)
     type_error(ins, 'is not an iterable', (err_level or 1) + 1)
   end
 
-  local common_ex = {iter = iter}
+  local common_ex = {iter = iter, IteratorWrapper = iterator_wrapper}
   --endregion
 
   --region CB extension
@@ -97,8 +130,8 @@ function ExtendCommonPackage(common, Class, CB)
     return false
   end
 
-  function common_ex.sum(iterable)
-    local sum = 0
+  function common_ex.sum(iterable, start)
+    local sum = start or 0
     for v in iter(iterable, 2) do
       sum = sum + v
     end
@@ -115,23 +148,20 @@ function ExtendCommonPackage(common, Class, CB)
     if start ~= nil and type(start) ~= 'number' then
       error('start must be a number or nil, got ' .. type_repr(start), 3)
     end
-    local iterator, state, init_value = iter(iterable, 3)
+    local iterator = iter(iterable, 3)
 
     local values = self.__values
     values.index = (start or 1) - 1
     values.iterator = iterator
-    values.state = state
-    values.v = init_value
   end
 
   function enumerate:__inext()
     local values = self.__values
-    local result = table.pack(values.iterator(values.state, values.v))
+    local result = table.pack(values.iterator())
     local var = result[1]
     if var ~= nil then
       local index = values.index + 1
       values.index = index
-      values.v = var
       return index, table.unpack(result, 1, result.n)
     end
 
@@ -149,27 +179,23 @@ function ExtendCommonPackage(common, Class, CB)
     if filter_func ~= nil and type(filter_func) ~= 'function' then
       error('filter_func must be a function or nil, got ' .. type_repr(filter_func), 3)
     end
-    local iterator, state, init_value = iter(iterable, 3)
+    local iterator = iter(iterable, 3)
 
     local values = self.__values
     values.filter = filter_func or default_filter
     values.iterator = iterator
-    values.state = state
-    values.v = init_value
   end
 
   function filter:__inext()
     local values = self.__values
     local iterator = values.iterator
-    local state = values.state
-    local var = values.v
     local f = values.filter
+    local var
     repeat
-      var = iterator(state, var)
+      var = iterator()
       if var == nil then return nil end
     until f(var)
 
-    values.v = var
     return var
   end
 
@@ -189,8 +215,7 @@ function ExtendCommonPackage(common, Class, CB)
 
     local iterators = {}
     for i = 1, iterables.n do
-      local it, s, v = iter(iterables[i], 3)
-      table.insert(iterators, {iterator = it, state = s, v = v})
+      table.insert(iterators, iter(iterables[i], 3))
     end
 
     self.__values.map = map_func
@@ -199,11 +224,10 @@ function ExtendCommonPackage(common, Class, CB)
 
   function map:__inext()
     local args = {}
-    for _, t in ipairs(self.__values.iterators) do
-      local var = t.iterator(t.state, t.v)
+    for i, iterator in ipairs(self.__values.iterators) do
+      local var = iterator()
       if var == nil then return nil end
-      t.v = var
-      table.insert(args, var)
+      args[i] = var
     end
 
     return self.__values.map(table.unpack(args))
@@ -220,22 +244,20 @@ function ExtendCommonPackage(common, Class, CB)
       error('no iterable is passed', 3)
     end
 
-    local iterables = {}
+    local iterators = {}
     for i = 1, args.n do
-      local it, s, v = iter(args[i], 3)
-      table.insert(iterables, {iterator = it, state = s, v = v})
+      table.insert(iterators, iter(args[i], 3))
     end
 
-    self.__values.iterables = iterables
+    self.__values.iterators = iterators
   end
 
   function zip:__inext()
     local result = {}
-    for _, t in ipairs(self.__values.iterables) do
-      local var = t.iterator(t.state, t.v)
+    for i, iterator in ipairs(self.__values.iterators) do
+      local var = iterator()
       if var == nil then return nil end
-      t.v = var
-      table.insert(result, var)
+      result[i] = var
     end
 
     return result
@@ -251,15 +273,14 @@ function ExtendCommonPackage(common, Class, CB)
     local result = {}
     local nil_count = 0
     local nils = {}
-    for i, t in ipairs(self.__values.iterables) do
-      local var = t.iterator(t.state, t.v)
+    for i, iterator in ipairs(self.__values.iterators) do
+      local var = iterator()
       if var == nil then
         nil_count = nil_count + 1
         nils[i] = true
       else
         nils[i] = false
-        t.v = var
-        table.insert(result, var)
+        result[i] = var
       end
     end
 
