@@ -90,6 +90,8 @@ do
   end
 
   -- todo add optimized way to get address of table without metatable
+  -- optimized means that colon is not searched,
+  -- because table without metatable always have colon at position 6
   function common.get_address(v)
     local str = tostring(v)
     local _, end_ = string.find(str, ': ', 1, true)
