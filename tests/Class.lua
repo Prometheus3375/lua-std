@@ -1,5 +1,4 @@
-dofile('library/common.lua')
-dofile('library/Class.lua')
+dofile('library/init.lua')
 
 function test_class()
   local Animal = {
@@ -63,8 +62,9 @@ function test_inheritance()
 end
 
 do
-  common = InitCommonPackage()
-  Class = InitClassPackage()
+  InitPLSL('library')
+  common = PLSL.common
+  Class = PLSL.Class
 
   issubclass = common.issubclass
   isinstance = common.isinstance

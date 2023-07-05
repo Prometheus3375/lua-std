@@ -1,8 +1,8 @@
-function InitCommonBases(common, Class, Interface)
+function PLSL.init.CommonBases()
   --region Initialization
-  common = common or _ENV.common or _ENV.Common
-  Class = Class or _ENV.Class
-  Interface = Interface or _ENV.Interface
+  local common = PLSL.common
+  local Class = PLSL.Class
+  local Interface = PLSL.Interface
 
   local Method = Interface.Method
 
@@ -58,5 +58,5 @@ function InitCommonBases(common, Class, Interface)
   CB.Collection = Interface('Collection', true, {}, CB.Container, CB.Iterable, CB.Sized)
   CB.OrderedCollection = Interface('OrderedCollection', true, {}, CB.Collection, CB.Reversible)
 
-  return setmetatable(CB, common.generate_package_metatable('Common Bases'))
+  PLSL.CommonBases = setmetatable(CB, common.generate_package_metatable('PLSL.CommonBases'))
 end
