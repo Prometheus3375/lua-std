@@ -5,6 +5,7 @@ function InitClassPackage(common)
   local repr = common.repr
   local type_repr = common.type_repr
   local number2index = common.number2index
+  local table_address = common.table.address
   local string_split = common.string.split
   local set2array = common.set.to_array
   local set_union = common.set.union
@@ -45,15 +46,13 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
-  -- todo add __id to class, instance and interface
-  -- represents table address
-
-  local known_indexers = setmetatable({}, __meta_weak_keys)
-  local function is_indexer(v) return known_indexers[v] or false end
+  --region Field definitions
+  local known_field_definitions = setmetatable({}, __meta_weak_keys)
+  local function is_field_definition(v) return known_field_definitions[v] or false end
 
   function Class.field(public)
     local result = {type = 'field', public = public and true or false}
-    known_indexers[result] = true
+    known_field_definitions[result] = true
     return result
   end
 
@@ -66,7 +65,7 @@ function InitClassPackage(common)
       error('property setter must be a function, got ' .. repr(setter), 2)
     end
     local result = {type = 'property', getter = getter, setter = setter}
-    known_indexers[result] = true
+    known_field_definitions[result] = true
     return result
   end
 
@@ -75,7 +74,7 @@ function InitClassPackage(common)
       error('meta must have a value', 2)
     end
     local result = {type = 'meta', value = value}
-    known_indexers[result] = true
+    known_field_definitions[result] = true
     return result
   end
 
@@ -99,7 +98,9 @@ function InitClassPackage(common)
       cls.__meta[key] = description.value
     end,
   }
+  --endregion
 
+  --region Common meta functions
   local function index(self, cls, key)
     -- process numeric keys
     if type(key) == 'number' then
@@ -155,6 +156,12 @@ function InitClassPackage(common)
     error(repr(cls.__name) .. ' instance does not have settable key ' .. repr(key), 3)
   end
 
+  local function to_string(self, cls)
+    return string.format('<%s instance at 0x%016X>', cls.__name, self.__id)
+  end
+  --endregion
+
+  --region Class functions
   local function class_len() error('classes do not support length operator', 2) end
   local function class_pairs() error('classes do not support pairs()', 2) end
 
@@ -171,11 +178,14 @@ function InitClassPackage(common)
       __class = cls,
       __values = {},
     }
+    self.__id = table_address(self)
     setmetatable(self, cls.__meta)
     cls.__init(self, ...)
     return self
   end
+  --endregion
 
+  --region Instance functions
   local function instance_len(self)
     error(repr(self.__class.__name) .. ' instance does not support length operator', 2)
   end
@@ -192,6 +202,11 @@ function InitClassPackage(common)
     error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
   end
 
+  local function instance_tostring(self)
+    return to_string(self, self.__class)
+  end
+  --endregion
+
   function Class.tostring(ins)
     local meta = ins.__class.__meta
     local str = rawget(meta, '__tostring')
@@ -205,12 +220,7 @@ function InitClassPackage(common)
     return tostring(ins)
   end
 
-  local instance_raw_tostring = Class.tostring
-
-  function Class.addressof(ins)
-    return string.sub(instance_raw_tostring(ins), string.len(ins.__class.__meta.__name) + 3)
-  end
-
+  --region super
   local super_meta = {__metatable = true}
 
   -- If superclass does not have __len, but the class of instance has,
@@ -262,7 +272,7 @@ function InitClassPackage(common)
   -- super object must have a string representation for debugging
   -- Thus, it is not possible to use superclass' __tostring
   function super_meta:__tostring()
-    return '<super: ' .. tostring(self.__class) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
+    return '<super: ' .. tostring(self.__class) .. ', <' .. self.__ins.__class.__name .. ' instance>>'
   end
 
   local function super_get_parent(cls, parent)
@@ -287,16 +297,15 @@ function InitClassPackage(common)
     return setmetatable({__ins = ins, __class = parent}, super_meta)
   end
 
-  local addressof = Class.addressof
-
   function Class.super_tostring(ins, parent)
     parent = super_get_parent(ins.__class, parent)
     local meta = parent.__meta
     local str = meta.__tostring
     if str then return str(ins) end
 
-    return meta.__name .. ': ' .. addressof(ins)
+    return to_string(ins, parent)
   end
+  --endregion
 
   local class_indexers = {
     '__public',
@@ -306,6 +315,7 @@ function InitClassPackage(common)
 
   local prohibited_keys = common.set.from_array({
     -- instance keys
+    '__id',
     '__class',
     '__values',
     -- class keys
@@ -404,9 +414,11 @@ function InitClassPackage(common)
         __index = instance_index,
         __newindex = instance_newindex,
         __pairs = instance_pairs,
+        __tostring = instance_tostring,
         __metatable = true,
       },
     }
+    class.__id = table_address(class)
     -- todo make global
     local cls_meta = {
       __len = class_len,
@@ -418,7 +430,7 @@ function InitClassPackage(common)
     }
 
     for k, v in pairs(deftable) do
-      if is_indexer(v) then
+      if is_field_definition(v) then
         class_key_initializers[v.type](class, k, v)
       else
         class[k] = v
@@ -714,6 +726,7 @@ function InitClassPackage(common)
       __all_ancestors = {},
       __direct_ancestors = parents,
     }
+    interface.__id = table_address(interface)
 
     local name2itf = {
       __usual_methods = {},
