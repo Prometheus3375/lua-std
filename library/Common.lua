@@ -1,17 +1,82 @@
 function InitCommon()
   local common = {}
-  -- todo: add repr function
-  -- todo: add function to expose tables-libraries into globals scope
 
-  local None = setmetatable({}, {
-    __len = function() error('None does not support length operator', 2) end,
-    __index = function() error('None does not support indexing', 2) end,
-    __newindex = function() error('None does not support indexing', 2) end,
-    __tostring = function() return 'None' end,
-    __ipairs = function() error('None does not support ipairs()', 2) end,
-    __pairs = function() error('None does not support pairs()', 2) end,
-    __metatable = true,
-  })
+  function common.repr(v)
+    local s = string.format('%q', tostring(v))
+    if string.find(s, '\'', 1, true) then
+      return s
+    end
+    return "'" .. string.sub(s, 2, -2) .. "'"
+  end
+
+  local repr = common.repr
+
+  function common.number2index(num)
+    local rem = num % 100
+    if rem == 11 or rem == 12 or rem == 13 then
+      return num .. 'th'
+    end
+
+    rem = num % 10
+    if rem == 1 then
+      return num .. 'st'
+    end
+    if rem == 2 then
+      return num .. 'nd'
+    end
+    if rem == 3 then
+      return num .. 'rd'
+    end
+
+    return num .. 'th'
+  end
+
+  function common.set(array)
+    local set = {}
+    for _, v in ipairs(array) do
+      set[v] = true
+    end
+    return set
+  end
+
+  function common.generate_protected_metatable(name, plural)
+    local name_do = name .. (plural and ' do ' or ' does ') .. 'not support '
+    return {
+      __len = function() error(name_do .. 'length operator', 2) end,
+      __index = function() error(name_do .. 'index getting', 2) end,
+      __newindex = function() error(name_do .. 'index setting', 2) end,
+      __ipairs = function() error(name_do .. 'ipairs()', 2) end,
+      __pairs = function() error(name_do .. 'pairs()', 2) end,
+      __metatable = true,
+    }
+  end
+
+  local generate_protected_metatable = common.generate_protected_metatable
+
+  function common.generate_package_metatable(name)
+    name = 'package ' .. repr(name)
+    local meta = generate_protected_metatable(name, false)
+    meta.__pairs = nil
+    function meta.__tostring() return name end
+    return meta
+  end
+
+  function common.expose_package(package, renames, exclude)
+    renames = renames or {}
+    exclude = exclude or {}
+    for name, field in pairs(package) do
+      if renames[name] then
+        _ENV[renames[name]] = field
+      elseif not exclude[name] then
+        _ENV[name] = field
+      end
+    end
+  end
+
+  --region None
+  local none_metatable = generate_protected_metatable('None', false)
+  function none_metatable.__tostring() return 'None' end
+  local None = setmetatable({}, none_metatable)
 
   common.None = None
 
@@ -40,6 +105,7 @@ function InitCommon()
     end
     return ins
   end
+  --endregion
 
   -- todo move code below to abstract.lua where it will modify common
   local function not_of_type(ins, typ, level)
@@ -117,8 +183,5 @@ function InitCommon()
     not_of_type(iterator, 'an iterator', 3)
   end
 
-  -- todo: protect common
-  return setmetatable(common, {
-
-  })
+  return setmetatable(common, common.generate_package_metatable('Common'))
 end
