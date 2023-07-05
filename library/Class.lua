@@ -180,8 +180,16 @@ function InitClassPackage(common)
 
   local super_meta = {__metatable = true}
 
+  -- If superclass does not have __len, but the class of instance has,
+  -- then the error states that class of instance does not have __len.
+  -- Thus, checks are added to __len, __ipairs and __pairs to emit correct errors.
   function super_meta:__len()
-    return self.__cls.__meta.__len(self.__ins)
+    local len = self.__cls.__meta.__len
+    if len == instance_len then
+      error(self.__cls.__name .. ' instances do not support length operator', 2)
+    end
+
+    return len(self.__ins)
   end
 
   function super_meta:__index(key)
@@ -193,13 +201,25 @@ function InitClassPackage(common)
   end
 
   function super_meta:__ipairs()
-    return self.__cls.__meta.__ipairs(self.__ins)
+    local ipairs = self.__cls.__meta.__ipairs
+    if ipairs == instance_ipairs then
+      error(self.__cls.__name .. ' instances do not support ipairs()', 2)
+    end
+
+    return ipairs(self.__ins)
   end
 
   function super_meta:__pairs()
-    return self.__cls.__meta.__pairs(self.__ins)
+    local pairs = self.__cls.__meta.__pairs
+    if pairs == instance_pairs then
+      error(self.__cls.__name .. ' instances do not support pairs()', 2)
+    end
+
+    return pairs(self.__ins)
   end
 
+  -- super object must have a string representation for debugging
+  -- Thus, it is not possible to use superclass' __tostring
   function super_meta:__tostring()
     return '<super: ' .. tostring(self.__cls) .. ', <' .. self.__ins.__class.__meta.__name .. '>>'
   end
