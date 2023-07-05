@@ -71,69 +71,6 @@ function InitCommonPackage()
     return num .. 'th'
   end
 
-  function common.table_length(t)
-    local n = 0
-    for _, _ in pairs(t) do
-      n = n + 1
-    end
-    return n
-  end
-
-  function common.string_split(s, pattern, maxsplit, regex)
-    local no_max = maxsplit == nil or maxsplit < 0
-    local init = 1
-    local from = {}
-    local to = {}
-    local plain = not (regex and true or false)
-
-    while no_max or #from < maxsplit do
-      local f, t = string.find(s, pattern, init, plain)
-      if f then
-        table.insert(from, init)
-        table.insert(to, f - 1)
-        init = t + 1
-      else
-        break
-      end
-    end
-
-    table.insert(from, init)
-    table.insert(to, #s)
-
-    local result = {}
-    for i, f in ipairs(from) do
-      table.insert(result, string.sub(s, f, to[i]))
-    end
-    return result
-  end
-
-  -- todo: create package primitive set for all set operations?
-  function common.array2set(a)
-    local s = {}
-    for _, v in ipairs(a) do
-      s[v] = true
-    end
-    return s
-  end
-
-  function common.set2array(s)
-    local a = {}
-    for v, _ in pairs(s) do
-      table.insert(a, v)
-    end
-    return a
-  end
-
-  function common.set_union(result, ...)
-    result = result or {}
-    for _, s in ipairs({result, ...}) do
-      for v, _ in pairs(s) do
-        result[v] = true
-      end
-    end
-    return result
-  end
-
   local function enum_next(state, index)
     -- 1 - iterator function
     -- 2 - state of the iterator
@@ -176,6 +113,8 @@ function InitCommonPackage()
     function meta.__tostring() return '<' .. name .. '>' end
     return meta
   end
+
+  local gen_pack_meta = common.generate_package_metatable
 
   function common.expose_package(package, global, renames, exclude)
     global = global or _ENV
@@ -220,5 +159,89 @@ function InitCommonPackage()
   end
   --endregion
 
-  return setmetatable(common, common.generate_package_metatable('Common'))
+  --region table
+  common.table = {}
+
+  function common.table:length()
+    local n = 0
+    for _, _ in pairs(self) do
+      n = n + 1
+    end
+    return n
+  end
+
+  function common.table:is_empty()
+    return next(self) == nil
+  end
+
+  setmetatable(common.table, gen_pack_meta('common.table'))
+  --endregion
+
+  --region set
+  common.set = {}
+
+  function common.set.from_array(a)
+    local s = {}
+    for _, v in ipairs(a) do
+      s[v] = true
+    end
+    return s
+  end
+
+  function common.set.to_array(self)
+    local a = {}
+    for v, _ in pairs(self) do
+      table.insert(a, v)
+    end
+    return a
+  end
+
+  function common.set.union(result, ...)
+    result = result or {}
+    for _, s in ipairs({result, ...}) do
+      for v, _ in pairs(s) do
+        result[v] = true
+      end
+    end
+    return result
+  end
+
+  setmetatable(common.set, gen_pack_meta('common.set'))
+  --endregion
+
+  --region string
+  common.string = {}
+
+  function common.string:split(pattern, maxsplit, regex)
+    local no_max = maxsplit == nil or maxsplit < 0
+    local init = 1
+    local from = {}
+    local to = {}
+    local plain = not (regex and true or false)
+
+    while no_max or #from < maxsplit do
+      local f, t = string.find(self, pattern, init, plain)
+      if f then
+        table.insert(from, init)
+        table.insert(to, f - 1)
+        init = t + 1
+      else
+        break
+      end
+    end
+
+    table.insert(from, init)
+    table.insert(to, #self)
+
+    local result = {}
+    for i, f in ipairs(from) do
+      table.insert(result, string.sub(self, f, to[i]))
+    end
+    return result
+  end
+
+  setmetatable(common.string, gen_pack_meta('common.string'))
+  --endregion
+
+  return setmetatable(common, gen_pack_meta('common'))
 end
