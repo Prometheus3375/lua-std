@@ -79,6 +79,34 @@ function InitCommonPackage()
     return n
   end
 
+  function common.string_split(s, pattern, maxsplit, regex)
+    local no_max = maxsplit == nil or maxsplit < 0
+    local init = 1
+    local from = {}
+    local to = {}
+    local plain = not (regex and true or false)
+
+    while no_max or #from < maxsplit do
+      local f, t = string.find(s, pattern, init, plain)
+      if f then
+        table.insert(from, init)
+        table.insert(to, f - 1)
+        init = t + 1
+      else
+        break
+      end
+    end
+
+    table.insert(from, init)
+    table.insert(to, #s)
+
+    local result = {}
+    for i, f in ipairs(from) do
+      table.insert(result, string.sub(s, f, to[i]))
+    end
+    return result
+  end
+
   -- todo: create package primitive set for all set operations?
   function common.array2set(a)
     local s = {}
