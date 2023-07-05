@@ -146,7 +146,7 @@ function InitClasses()
     local add = {
         field = function (class, key, description)
             if description.public then
-                calss.__public[key] = 0
+                class.__public[key] = 0
             else
                 class.__readonly[key] = 0
             end
@@ -154,8 +154,8 @@ function InitClasses()
         
         property = function (class, key, description)
             class.__properties[key] = {
-                getter = description.getter
-                setter = description.setter
+                getter = description.getter,
+                setter = description.setter,
             }
         end,
         
@@ -222,7 +222,7 @@ function InitClasses()
                 init = v
             elseif special_fields[k] then
                 error(' key \''..key..'\' is prohibited to use inside a class')
-            elseif add[v.type] then
+            elseif type(v) == 'table' and add[v.type] then
                 add[v.type](class, k, v)
             else
                 class[k] = v
