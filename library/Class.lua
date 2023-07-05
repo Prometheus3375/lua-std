@@ -58,7 +58,7 @@ function InitClassPackage(common)
       return
     end
 
-    error('instance of type ' .. cls.__name .. ' does not have a settable field ' .. repr(key), 3)
+    error('instance of type ' .. cls.__name .. ' does not have settable key ' .. repr(key), 3)
   end
 
   local function index(self, cls, key)
@@ -80,7 +80,7 @@ function InitClassPackage(common)
     if not rawequal(value, nil) then
       return value
     end
-    error('instance of type ' .. cls.__name .. ' does not have a gettable field ' .. repr(key), 3)
+    error('instance of type ' .. cls.__name .. ' does not have gettable key ' .. repr(key), 3)
   end
 
   local function instance_newindex(self, key, value)
