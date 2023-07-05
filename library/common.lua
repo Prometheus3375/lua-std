@@ -173,6 +173,10 @@ do
   --region math
   local __math = {}
 
+  function __math.sign(x)
+    return x > 0 and 1 or (x < 0 and -1 or 0)
+  end
+
   function __math.round(x)
     local n, f = math.modf(x)
     if f == 0.5 or f == -0.5 then
