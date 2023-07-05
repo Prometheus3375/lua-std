@@ -9,19 +9,13 @@ do
   local isclass = common.isclass
   local isinstance = common.isinstance
 
-  -- todo add hash.lua
-  -- number hash: https://docs.python.org/3/library/stdtypes.html#typesnumeric
-  -- detect if number is int: https://stackoverflow.com/questions/36063303/lua-5-3-integers-type-lua-type/36063799
-  -- tuple hash: https://stackoverflow.com/questions/49722196/how-does-python-compute-the-hash-of-a-tuple
-  -- set hash in collections abc
-  -- string hash: ???
-
   local Callable = CB.Callable
   local Container = CB.Container
   local Iterable = CB.Iterable
   local Iterator = CB.Iterator
   local Reversible = CB.Reversible
   local SupportsGetNumericKey = CB.SupportsGetNumericKey
+  local SupportsPrettyString = CB.SupportsPrettyString
 
   local function type_error(ins, err, level)
     level = (level or 1) + 1
@@ -90,6 +84,14 @@ do
     end
 
     type_error(ins, 'is not reversible', 2)
+  end
+
+  function common_ex.str(ins)
+    if isinstance(ins, SupportsPrettyString) then
+      return ins:__str()
+    end
+
+    return repr(ins)
   end
   --endregion
 
