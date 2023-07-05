@@ -12,8 +12,30 @@ function InitClassPackage(common)
   local known_interfaces = setmetatable({}, __meta_weak_keys)
 
   local function isclass(cls) return known_classes[cls] or false end
-
   local function isinterface(itf) return known_interfaces[itf] or false end
+
+  local class_names = setmetatable({}, __meta_weak_values)
+  local interface_names = setmetatable({}, __meta_weak_values)
+
+  local function get_names(t, as_set)
+    local result = {}
+    if as_set then
+      for name, _ in pairs(t) do
+        result[name] = true
+      end
+    else
+      for name, _ in pairs(t) do
+        table.insert(result, name)
+      end
+      table.sort(result)
+    end
+    return result
+  end
+
+  function Class.GetByName(name) return class_names[name] end
+  function Class.GetNames(as_set) return get_names(class_names, as_set) end
+  function Interface.GetByName(name) return interface_names[name] end
+  function Interface.GetNames(as_set) return get_names(interface_names, as_set) end
 
   local repr = common.repr
   local number2index = common.number2index
@@ -83,14 +105,6 @@ function InitClassPackage(common)
     error('instance of type ' .. cls.__name .. ' does not have gettable key ' .. repr(key), 3)
   end
 
-  local function instance_newindex(self, key, value)
-    newindex(self, self.__class, key, value)
-  end
-
-  local function instance_index(self, key)
-    return index(self, self.__class, key)
-  end
-
   local super_meta = gen_meta('super', false)
 
   function super_meta.__newindex(self, key, value)
@@ -141,7 +155,7 @@ function InitClassPackage(common)
     return {type = 'meta', value = value}
   end
 
-  local add_class_indexer = {
+  local class_field_initializers = {
     field = function(cls, key, description)
       if description.public then
         cls.__public[key] = true
@@ -162,6 +176,14 @@ function InitClassPackage(common)
     end,
   }
 
+  local function class_len() error('classes do not support length operator', 2) end
+  local function class_ipairs() error('classes do not support ipairs()', 2) end
+  local function class_pairs() error('classes do not support pairs()', 2) end
+
+  local function class_newindex(self, key, _)
+    error('class ' .. repr(self.name) .. ' does not have key ' .. repr(key) .. ' to set', 2)
+  end
+
   local function class_tostring(cls)
     return '<class ' .. repr(cls.__name) .. '>'
   end
@@ -176,6 +198,26 @@ function InitClassPackage(common)
     return self
   end
 
+  local function instance_len(self)
+    error(self.__class.__name .. ' instances do not support length operator', 2)
+  end
+
+  local function instance_newindex(self, key, value)
+    newindex(self, self.__class, key, value)
+  end
+
+  local function instance_index(self, key)
+    return index(self, self.__class, key)
+  end
+
+  local function instance_ipairs(self)
+    error(self.__class.__name .. ' instances do not support ipairs()', 2)
+  end
+
+  local function instance_pairs(self)
+    error(self.__class.__name .. ' instances do not support pairs()', 2)
+  end
+
   local subclass
   local function empty_function() end
 
@@ -183,7 +225,6 @@ function InitClassPackage(common)
     '__public',
     '__readonly',
     '__properties',
-    '__meta',
   }
 
   local special_fields = common.set({
@@ -209,24 +250,6 @@ function InitClassPackage(common)
     '__ins',
     '__cls',
   })
-
-  local default_instance_meta = {
-    __len = function(self)
-      error(self.__class.__name .. ' instances do not support length operator', 2)
-    end,
-    __ipairs = function(self)
-      error(self.__class.__name .. ' instances do not support ipairs()', 2)
-    end,
-    __pairs = function(self)
-      error(self.__class.__name .. ' instances do not support pairs()', 2)
-    end,
-  }
-
-  local default_meta_of_instance_meta = {__index = default_instance_meta}
-
-  local class_names = setmetatable({}, __meta_weak_values)
-
-  function Class.GetByName(name) return class_names[name] end
 
   local function create_class(name, deftable, ...)
     --region Check arguments
@@ -264,28 +287,37 @@ function InitClassPackage(common)
       __public = {},
       __readonly = {},
       __properties = {},
-      __meta = setmetatable({
-        __index = instance_index,
-        __newindex = instance_newindex,
-        __name = name .. ' instance',
-        __metatable = true,
-      }, default_meta_of_instance_meta),
       __subs = {},
     }
+
     local init = empty_function
-    local meta = gen_meta('classes', true)
-    meta.__tostring = class_tostring
-    meta.__call = new_instance
+    local ins_meta = {
+      __len = instance_len,
+      __index = instance_index,
+      __newindex = instance_newindex,
+      __ipairs = instance_ipairs,
+      __pairs = instance_pairs,
+      __metatable = true,
+    }
     local sub_metas = {}
     local supers = {}
+    local cls_meta = {
+      __len = class_len,
+      __newindex = class_newindex,
+      __ipairs = class_ipairs,
+      __pairs = class_pairs,
+      __tostring = class_tostring,
+      __call = new_instance,
+      __metatable = true,
+    }
 
     for k, v in pairs(deftable) do
       if k == 'new' then
         init = v
       elseif special_fields[k] then
         error('field name ' .. repr(k) .. ' is prohibited to use inside a class', 3)
-      elseif type(v) == 'table' and add_class_indexer[v.type] then
-        add_class_indexer[v.type](class, k, v)
+      elseif type(v) == 'table' and class_field_initializers[v.type] then
+        class_field_initializers[v.type](class, k, v)
       else
         class[k] = v
       end
@@ -304,10 +336,15 @@ function InitClassPackage(common)
         supers[p] = true
       end
 
-      for _, k in ipairs(class_indexers) do
-        setmetatable(class[k], parent_class.__sub_metas[k])
+      for _, indexer in ipairs(class_indexers) do
+        setmetatable(class[indexer], parent_class.__sub_metas[indexer])
       end
-      meta.__index = parent_class
+      for metaname, metamethod in pairs(parent_class.__meta) do
+        if not ins_meta[metaname] then
+          ins_meta[metaname] = metamethod
+        end
+      end
+      cls_meta.__index = parent_class
 
       if rawequal(init, empty_function) then
         init = parent_class.__init
@@ -316,15 +353,17 @@ function InitClassPackage(common)
 
     class.__init = init
     class.new = new_instance
+    class.__meta = ins_meta
     class.subclass = subclass
     class.__sub_metas = sub_metas
     class.__supers = supers
 
     known_classes[class] = true
+    class_names[name] = class
     for _, itf in ipairs(parent_interfaces) do
       itf:Register(class)
     end
-    return setmetatable(class, meta)
+    return setmetatable(class, cls_meta)
   end
 
   subclass = function(parent, name, deftable, ...)
@@ -447,10 +486,6 @@ function InitClassPackage(common)
 
   end
 
-  local interface_names = setmetatable({}, __meta_weak_values)
-
-  function Interface.GetByName(name) return interface_names[name] end
-
   local function define_interface(name, methods, ...)
     --region Check arguments
     if interface_names[name] then
@@ -535,6 +570,7 @@ function InitClassPackage(common)
     }, interface_meta)
 
     known_interfaces[result] = true
+    interface_names[name] = result
     return result
   end
 
