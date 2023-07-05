@@ -2,11 +2,15 @@ function InitCommonPackage()
   local common = {}
 
   function common.repr(v)
-    local s = string.format('%q', tostring(v))
-    if string.find(s, '\'', 1, true) then
-      return s
+    if type(v) == 'string' then
+      v = string.format('%q', v)
+      if string.find(v, '\'', 1, true) then
+        return v
+      end
+      return "'" .. string.sub(v, 2, -2) .. "'"
     end
-    return "'" .. string.sub(s, 2, -2) .. "'"
+
+    return tostring(v)
   end
 
   local repr = common.repr
