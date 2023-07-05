@@ -48,15 +48,16 @@ function InitClassPackage(common)
     return {type = 'field', public = public}
   end
 
+  -- todo check that getter and setter are functions
   function Class.property(getter, setter)
-    if rawequal(getter, nil) and rawequal(setter, nil) then
+    if getter == nil and setter == nil then
       error('property must have either a getter or a setter or both', 2)
     end
     return {type = 'property', getter = getter, setter = setter}
   end
 
   function Class.meta(value)
-    if rawequal(value, nil) then
+    if value == nil then
       error('meta must have a value', 2)
     end
     return {type = 'meta', value = value}
@@ -99,7 +100,7 @@ function InitClassPackage(common)
     end
     -- class fields and methods
     value = cls[key]
-    if not rawequal(value, nil) then
+    if value ~= nil then
       return value
     end
     error(repr(cls.__name) .. ' instance does not have gettable key ' .. repr(key), 3)
@@ -233,9 +234,9 @@ function InitClassPackage(common)
       if not cls.__supers[parent] then
         error('class ' .. repr(cls.__name) .. ' does not have superclass ' .. repr(parent.__name), 3)
       end
-    elseif rawequal(parent, nil) then
+    elseif parent == nil then
       parent = cls.super
-      if not parent then
+      if parent == nil then
         error('class ' .. repr(cls.__name) .. ' does not have a superclass', 3)
       end
     else
@@ -390,7 +391,7 @@ function InitClassPackage(common)
       end
       cls_meta.__index = parent_class
 
-      if rawequal(init, empty_function) then
+      if init == empty_function then
         init = parent_class.__init
       end
     end
@@ -442,7 +443,7 @@ function InitClassPackage(common)
   end
 
   function method_meta.__index:WithDefault(default)
-    if rawequal(default, nil) or type(default) == 'function' then
+    if default == nil or type(default) == 'function' then
       return setmetatable({
         name = self.name,
         signature = self.signature,
@@ -494,7 +495,7 @@ function InitClassPackage(common)
       local m_name = m_table.name
       local method = class_deftable[m_name] or class_parent[m_name]
 
-      if rawequal(method, nil) then
+      if method == nil then
         if m_table.default then
           class_deftable[m_name] = m_table.default
         else
@@ -512,13 +513,13 @@ function InitClassPackage(common)
       local meta_field = class_deftable[m_name]
       local method
 
-      if rawequal(meta_field, nil) then
+      if meta_field == nil then
         method = class_parent.__meta[m_name]
       else
         method = meta_field.value
       end
 
-      if rawequal(method, nil) then
+      if method == nil then
         if m_table.default then
           class_deftable[m_name] = Class_meta(m_table.default)
         else
@@ -652,7 +653,7 @@ function InitClassPackage(common)
 
     if isclass(value) then
       for _, other in ipairs(classes) do
-        if rawequal(value, other) or value.__supers[other] then
+        if value == other or value.__supers[other] then
           return true
         end
       end
