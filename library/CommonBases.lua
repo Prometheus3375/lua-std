@@ -65,5 +65,5 @@ do
   CB.Collection = Interface('Collection', true, {}, CB.Container, CB.Iterable, CB.Sized)
   CB.OrderedCollection = Interface('OrderedCollection', true, {}, CB.Collection, CB.Reversible)
 
-  PLSL.CommonBases = setmetatable(CB, common.generate_package_metatable('PLSL.CommonBases'))
+  PLSL.CommonBases = setmetatable(CB, common.generate_module_metatable('PLSL.CommonBases'))
 end
