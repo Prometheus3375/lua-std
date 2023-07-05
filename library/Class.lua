@@ -601,7 +601,11 @@ function InitClassPackage(common)
   end
 
   local function isinstance(ins, ...)
-    return issubclass_inner(ins.__class, ...)
+    if type(ins) == 'table' and isclass(ins.__class) then
+      return issubclass_inner(ins.__class, ...)
+    end
+
+    return false
   end
   --endregion
 
