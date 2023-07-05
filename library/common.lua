@@ -83,7 +83,7 @@ function InitCommonPackage()
     name = 'package ' .. repr(name)
     local meta = generate_protected_metatable(name, false)
     meta.__pairs = nil
-    function meta.__tostring() return name end
+    function meta.__tostring() return '<' .. name .. '>' end
     return meta
   end
 
