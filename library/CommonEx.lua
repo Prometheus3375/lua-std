@@ -9,7 +9,13 @@ function ExtendCommonPackage(common, Class, CB)
   local isclass = common.isclass
   local isinstance = common.isinstance
 
-  local Array = CB.Array
+  -- todo add hash.lua
+  -- number hash: https://docs.python.org/3/library/stdtypes.html#typesnumeric
+  -- detect if number is int: https://stackoverflow.com/questions/36063303/lua-5-3-integers-type-lua-type/36063799
+  -- tuple hash: https://stackoverflow.com/questions/49722196/how-does-python-compute-the-hash-of-a-tuple
+  -- set hash in collections abc
+  -- string hash: ???
+
   local Callable = CB.Callable
   local Container = CB.Container
   local Iterable = CB.Iterable
@@ -25,8 +31,9 @@ function ExtendCommonPackage(common, Class, CB)
     error(type_repr(ins) .. err, level)
   end
 
-  local iterator_wrapper
-  local sequence_iterator
+  local IteratorWrapper
+  local SequenceIterator
+  local StringIterator
   local is_sequence
   local iter
 
@@ -34,27 +41,6 @@ function ExtendCommonPackage(common, Class, CB)
   --endregion
 
   --region CB extension
-  function common_ex.array(ins)
-    if isinstance(ins, Array) then
-      return ins:__array()
-    end
-
-    if isinstance(ins, Iterable) then
-      local result = {}
-      -- keep it simple, only the first emitted value is added to the result
-      for v in ins:__iter() do
-        table.insert(result, v)
-      end
-      return result
-    end
-
-    if is_sequence(ins) then
-      return ins
-    end
-
-    type_error(ins, 'cannot be represented as an array', 2)
-  end
-
   function common_ex.contains(ins, value)
     if isinstance(ins, Container) then
       return ins:__contains(value)
@@ -72,6 +58,10 @@ function ExtendCommonPackage(common, Class, CB)
   end
 
   function common_ex.iter(ins, err_level)
+    if type(ins) == 'string' then
+      return StringIterator(ins)
+    end
+
     if isinstance(ins, Iterable) then
       local f, s, v = ins:__iter()
 
@@ -80,7 +70,7 @@ function ExtendCommonPackage(common, Class, CB)
       end
 
       if type(f) == 'function' then
-        return iterator_wrapper(f, s, v)
+        return IteratorWrapper(f, s, v)
       else
         error('first return value of __iter method must be an iterator instance or function, '
           .. ins.__class.__name .. '.__iter() returned ' .. type_repr(f), (err_level or 1) + 1)
@@ -88,7 +78,7 @@ function ExtendCommonPackage(common, Class, CB)
     end
 
     if is_sequence(ins) then
-      return sequence_iterator(ins)
+      return SequenceIterator(ins)
     end
 
     type_error(ins, 'is not an iterable', (err_level or 1) + 1)
@@ -129,10 +119,19 @@ function ExtendCommonPackage(common, Class, CB)
     return type(v) == 'function' or isclass(v) or isinstance(v, Callable)
   end
 
-  function common_ex.is_sequence(v)
-    if type(v) ~= 'table' then return false end
-    local k = next(v)
-    return k == nil or type(k) == 'number' or isinstance(v, SupportsGetNumericKey)
+  function common_ex.is_sequence(seq)
+    if type(seq) ~= 'table' then return false end
+    local k1, v = next(seq)
+    local k2 = next(seq, k1)
+
+    -- empty table
+    return k1 == nil
+      -- table with a numeric key
+      or type(k1) == 'number'
+      -- table.pack(...)
+      or (k1 == 'n' and type(v) == 'number' and (k2 == nil or type(k2 == 'number')))
+      -- SupportsGetNumericKey instances
+      or isinstance(seq, SupportsGetNumericKey)
   end
 
   --region enumerate
@@ -196,7 +195,7 @@ function ExtendCommonPackage(common, Class, CB)
   --endregion
 
   --region IteratorWrapper
-  iterator_wrapper = {}
+  local iterator_wrapper = {}
 
   function iterator_wrapper:__init(func, state, init_value)
     local values = self.__values
@@ -217,8 +216,8 @@ function ExtendCommonPackage(common, Class, CB)
     return nil
   end
 
-  iterator_wrapper = Class('IteratorWrapper', iterator_wrapper, Iterator)
-  common_ex.IteratorWrapper = iterator_wrapper
+  IteratorWrapper = Class('IteratorWrapper', iterator_wrapper, Iterator)
+  common_ex.IteratorWrapper = IteratorWrapper
   --endregion
 
   --region map
@@ -256,7 +255,7 @@ function ExtendCommonPackage(common, Class, CB)
   --endregion
 
   --region SequenceIterator
-  sequence_iterator = {}
+  local sequence_iterator = {}
 
   function sequence_iterator:__init(sequence)
     self.__values.seq = sequence
@@ -275,8 +274,36 @@ function ExtendCommonPackage(common, Class, CB)
     return nil
   end
 
-  sequence_iterator = Class('SequenceIterator', sequence_iterator, Iterator)
-  common_ex.SequenceIterator = sequence_iterator
+  SequenceIterator = Class('SequenceIterator', sequence_iterator, Iterator)
+  common_ex.SequenceIterator = SequenceIterator
+  --endregion
+
+  --region StringIterator
+  local string_iterator = {}
+
+  function string_iterator:__init(str)
+    local values = self.__values
+    values.str = str
+    values.byte_index = 1
+  end
+
+  function string_iterator:__inext()
+    local values = self.__values
+    local byte_index = values.byte_index
+    if byte_index then
+      local str = values.str
+      local next_byte_index = utf8.offset(str, 2, byte_index)
+      values.byte_index = next_byte_index
+      if next_byte_index then
+        return string.sub(str, byte_index, next_byte_index - 1)
+      end
+    end
+
+    return nil
+  end
+
+  StringIterator = Class('StringIterator', string_iterator, Iterator)
+  common_ex.StringIterator = StringIterator
   --endregion
 
   --region zip
