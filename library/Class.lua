@@ -481,13 +481,13 @@ function InitClassPackage(common)
 
   function signature_meta:__eq(other)
     return (self.has_vararg and other.has_vararg)
-      or (self.has_vararg and #self.arguments < #other.arguments)
-      or (other.has_vararg and #self.arguments > #other.arguments)
+      or (self.has_vararg and #self.arguments - 1 <= #other.arguments)
+      or (other.has_vararg and #self.arguments >= #other.arguments - 1)
       or #self.arguments == #other.arguments
   end
 
   local function signature_as_string(self)
-    return '(' .. table.concat(self.arguments, ', ') .. '>'
+    return '(' .. table.concat(self.arguments, ', ') .. ')'
   end
 
   local function define_signature(args)
@@ -511,6 +511,10 @@ function InitClassPackage(common)
       error('args must be a string, got ' .. type_repr(args), 2)
     end
 
+    if type(is_meta) ~= 'boolean' then
+      error('is_meta must be a boolean, got ' .. type_repr(is_meta), 2)
+    end
+
     args = string.gsub(args, '%s*,%s*', ',')
     args = string_split(args, ',')
 
@@ -518,9 +522,9 @@ function InitClassPackage(common)
       if type(arg) ~= 'string' then
         error('arguments must be a string, got ' .. type_repr(arg), 2)
       elseif arg == '...' then
-        if i ~= args.n then
+        if i ~= #args then
           error('vararg must be the last argument, got at the ' .. number2index(i) .. 'position, '
-            .. args.n .. ' positions total', 2)
+            .. #args .. ' positions total', 2)
         end
       elseif not string.match(arg, argument_name_pattern) then
         error('argument name must start with a letter or an underscore and '
@@ -538,7 +542,7 @@ function InitClassPackage(common)
 
     local result = {
       args = args,
-      is_meta = is_meta and true or false,
+      is_meta = is_meta,
       default = default,
       check_imp_absence = check_imp_absence or default_check_imp_absence,
     }
@@ -651,6 +655,10 @@ function InitClassPackage(common)
       error('name ' .. repr(name) .. ' is already in use', 3)
     end
 
+    if type(allow_method_check) ~= 'boolean' then
+      error('allow_method_check must be a boolean, got ' .. type_repr(allow_method_check), 3)
+    end
+
     if type(method_table) ~= 'table' then
       error('method_table must be a table, got ' .. type_repr(method_table), 3)
     end
@@ -681,7 +689,7 @@ function InitClassPackage(common)
 
     local interface = {
       __name = name,
-      __method_check_allowed = allow_method_check and true or false,
+      __method_check_allowed = allow_method_check,
       __usual_methods = {},
       __metamethods = {},
       __all_ancestors = {},
