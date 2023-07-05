@@ -323,14 +323,14 @@ function InitClassPackage(common)
     end
 
     if type(deftable) ~= 'table' then
-      error('definition table must be a table, got ' .. type_repr(deftable), 3)
+      error('deftable must be a table, got ' .. type_repr(deftable), 3)
     end
 
     for k, v in pairs(deftable) do
       if type(k) ~= 'string' then
-        error('only string keys are allowed to use inside a class, got ' .. type_repr(k), 3)
+        error('only string keys are allowed, got ' .. type_repr(k), 3)
       elseif prohibited_keys[k] then
-        error('key ' .. repr(k) .. ' is prohibited to use inside a class', 3)
+        error('key ' .. repr(k) .. ' is prohibited to use', 3)
       elseif special_keys[k] and type(v) ~= special_keys[k] then
         error('key ' .. repr(k) .. ' must be a ' .. special_keys[k] .. ', got ' .. type_repr(v), 3)
       end
@@ -447,73 +447,96 @@ function InitClassPackage(common)
   --endregion
 
   --region Interface variables
-  -- todo rework Interfaces
-  -- make them accept tables name - value where each value is a table of format
-  -- {value, check_class, check_interface}
-  -- value can be a Value or a Method
-  -- check_class and check_interface are function that take 2 args and compares them
-  -- if the result is true, other class/interface is a valid descendant
   --region Methods
-  -- todo add Signature object
-  -- signatures are equal when one of them have vararg. Otherwise, number of arguments must be equal
-  local method_meta = gen_meta('interface methods', true)
-  method_meta.__index = {}
+  local signature_meta = gen_meta('signatures', true)
+  signature_meta.__metatable = signature_meta
 
-  function method_meta:__tostring()
-    if self.is_metamethod then
-      return '<interface metamethod ' .. self.name .. self.signature .. '>'
-    end
-
-    return '<interface method ' .. self.name .. self.signature .. '>'
+  function signature_meta:__tostring()
+    return '<signature (' .. table.concat(self.arguments, ', ') .. ')>'
   end
 
-  function method_meta:__eq(other)
-    return self.is_metamethod == other.is_metamethod
-      and self.name == other.name
-      and self.signature == other.signature
+  function signature_meta:__eq(other)
+    return (self.has_vararg and other.has_vararg)
+      or (self.has_vararg and #self.arguments < #other.arguments)
+      or (other.has_vararg and #self.arguments > #other.arguments)
+      or #self.arguments == #other.arguments
   end
 
-  function method_meta.__index:WithDefault(default)
-    if default == nil or type(default) == 'function' then
-      return setmetatable({
-        name = self.name,
-        signature = self.signature,
-        is_metamethod = self.is_metamethod,
-        default = default,
-      }, method_meta)
-    end
-
-    error('default must be a function or nil, got ' .. repr(default), 2)
+  local function signature_as_string(self)
+    return '(' .. table.concat(self.arguments, ', ') .. '>'
   end
 
-  function Interface.DefineMethod(name, signature, is_metamethod)
-    -- todo check that name is a string and not in prohibited_keys
-    -- todo check that signature is a string
+  local function define_signature(args)
     return setmetatable({
-      name = name,
-      signature = signature,
-      is_metamethod = is_metamethod and true or false,
-    }, method_meta)
+      arguments = args,
+      has_vararg = args[#args] == '...',
+    }, signature_meta)
+  end
+
+  local known_methods = setmetatable({}, __meta_weak_keys)
+  local function is_method(v) return known_methods[v] or false end
+
+  local function default_check_imp_absence(func)
+    return type(func) ~= 'function'
+  end
+
+  local argument_name_pattern = "^[a-zA-Z_][a-zA-Z_0-9]*$"
+
+  function Interface.Method(args, is_meta, default, check_imp_absence)
+    if type(args) ~= 'table' then
+      error('args must be a table, got ' .. type_repr(args), 2)
+    end
+
+    for i, arg in ipairs(args) do
+      if type(arg) ~= 'string' then
+        error('arguments must be a string, got ' .. type_repr(arg), 2)
+      elseif arg == '...' then
+        if i ~= args.n then
+          error('vararg must be the last argument, got at the ' .. number2index(i) .. 'position, '
+            .. args.n .. ' positions total', 2)
+        end
+      elseif not string.match(arg, argument_name_pattern) then
+        error('argument name must start with a letter or an underscore and '
+          .. 'may contain letters, digits and underscores, got ' .. repr(arg), 2)
+      end
+    end
+
+    if default ~= nil and type(default) ~= 'function' then
+      error('default must be a function or nil, got ' .. type_repr(default), 2)
+    end
+
+    if check_imp_absence ~= nil and type(check_imp_absence) ~= 'function' then
+      error('check_imp_absence must be a function or nil, got ' .. type_repr(check_imp_absence), 2)
+    end
+
+    local result = {
+      args = args,
+      is_meta = is_meta and true or false,
+      default = default,
+      check_imp_absence = check_imp_absence or default_check_imp_absence,
+    }
+    known_methods[result] = true
+    return result
   end
   --endregion
 
   local interface_meta = gen_meta('interfaces', true)
   function interface_meta.__tostring(self) return '<interface ' .. repr(self.__name) .. '>' end
 
-  local keys_of_method_tables = {'__simple_methods', '__meta_methods'}
+  local keys_of_method_tables = {'__usual_methods', '__metamethods'}
 
   local function interface_check_if_class_implements(self, cls)
     if cls.__interfaces[self] then return true end
 
     if self.__method_check_allowed then
-      for _, m_table in ipairs(self.__simple_methods) do
-        if type(cls[m_table.name]) ~= 'function' then
+      for m_name, m_table in pairs(self.__usual_methods) do
+        if m_table.does_not_implement(cls[m_name]) then
           return false
         end
       end
 
-      for _, m_table in ipairs(self.__meta_methods) do
-        if type(cls.__meta[m_table.name]) ~= 'function' then
+      for m_name, m_table in pairs(self.__metamethods) do
+        if m_table.does_not_implement(cls.__meta[m_name]) then
           return false
         end
       end
@@ -531,13 +554,12 @@ function InitClassPackage(common)
 
     if self.__method_check_allowed then
       for _, key in ipairs(keys_of_method_tables) do
-        local name2method = {}
-        for _, m_table in ipairs(other[key]) do
-          name2method[m_table.name] = m_table
-        end
+        local other_methods = other[key]
 
-        for _, m_table in ipairs(self[key]) do
-          if m_table ~= name2method[m_table.name] then
+        for m_name, m_table in pairs(self[key]) do
+          local other_method = other_methods[m_name]
+
+          if not other_method or other_method.signature ~= m_table.signature then
             return false
           end
         end
@@ -553,28 +575,24 @@ function InitClassPackage(common)
   end
 
   local Class_meta = Class.meta
-  interface_prepare_class_deftable = function(self, class_deftable, class_parent)
+
+  function interface_prepare_class_deftable(self, class_deftable, class_parent)
     class_parent = class_parent or {__meta = {}}
 
-    for _, m_table in ipairs(self.__simple_methods) do
-      local m_name = m_table.name
+    for m_name, m_table in pairs(self.__usual_methods) do
       local method = class_deftable[m_name] or class_parent[m_name]
 
-      if method == nil then
+      if m_table.does_not_implement(method) then
         if m_table.default then
           class_deftable[m_name] = m_table.default
         else
           error('any descendant of interface ' .. repr(self.__name) .. ' must implement '
-            .. m_name .. m_table.signature, 4)
+            .. m_name .. signature_as_string(m_table.signature), 4)
         end
-      elseif type(method) ~= 'function' then
-        error('any descendant of interface ' .. repr(self.__name) .. ' must have ' .. m_name ..
-          ' as a function with signature ' .. m_table.signature, 4)
       end
     end
 
-    for _, m_table in ipairs(self.__meta_methods) do
-      local m_name = m_table.name
+    for m_name, m_table in pairs(self.__metamethods) do
       local meta_field = class_deftable[m_name]
       local method
 
@@ -584,22 +602,19 @@ function InitClassPackage(common)
         method = meta_field.value
       end
 
-      if method == nil then
+      if m_table.does_not_implement(method) then
         if m_table.default then
           class_deftable[m_name] = Class_meta(m_table.default)
         else
           error('any descendant of interface ' .. repr(self.__name) .. ' must implement metamethod '
-            .. m_name .. m_table.signature, 4)
+            .. m_name .. signature_as_string(m_table.signature), 4)
         end
-      elseif type(method) ~= 'function' then
-        error('any descendant of interface ' .. repr(self.__name) .. ' must have ' .. m_name ..
-          ' as a metamethod with signature ' .. m_table.signature, 4)
       end
     end
 
   end
 
-  local function define_interface(name, allow_method_check, methods, ...)
+  local function define_interface(name, allow_method_check, method_table, ...)
     --region Check arguments
     if type(name) ~= 'string' then
       error('name must be a string, got ' .. type_repr(name), 3)
@@ -609,12 +624,20 @@ function InitClassPackage(common)
       error('name ' .. repr(name) .. ' is already in use', 3)
     end
 
-    if type(methods) ~= 'table' then
-      error('method definition table must be a table, got ' .. type_repr(methods), 3)
+    if type(method_table) ~= 'table' then
+      error('method_table must be a table, got ' .. type_repr(method_table), 3)
     end
 
-    -- todo check that methods content are all methods
-    -- using m_table.WithDefault == method_meta.__index.WithDefault
+    for k, v in pairs(method_table) do
+      if type(k) ~= 'string' then
+        error('only string keys are allowed, got ' .. type_repr(k), 3)
+      elseif prohibited_keys[k] then
+        error('key ' .. repr(k) .. ' is prohibited to use', 3)
+      elseif not is_method(v) then
+        error('method definition table must contain only methods, got '
+          .. type_repr(v) .. ' as method with name ' .. repr(k), 3)
+      end
+    end
 
     local passed_parents = table.pack(...)
     local parents = {}
@@ -629,75 +652,66 @@ function InitClassPackage(common)
     end
     --endregion
 
-    local simple = {
-      methods = {},
-      name2method = {},
-      name2interface = {},
+    local interface = {
+      __name = name,
+      __method_check_allowed = allow_method_check and true or false,
+      __usual_methods = {},
+      __metamethods = {},
+      __all_ancestors = {},
+      __direct_ancestors = parents,
     }
-    local meta = {
-      methods = {},
-      name2method = {},
-      name2interface = {},
+
+    local name2itf = {
+      __usual_methods = {},
+      __metamethods = {},
     }
-    for _, m_table in ipairs(methods) do
-      local t = m_table.is_metamethod and meta or simple
-      table.insert(t.methods, m_table)
-      t.name2method[m_table.name] = m_table
-      t.name2interface[m_table.name] = name
+
+    for k, m_table in pairs(method_table) do
+      local key = m_table.is_metamethod and '__metamethods' or '__usual_methods'
+      interface[key][k] = {
+        signature = define_signature(m_table.args),
+        default = m_table.default,
+        does_not_implement = m_table.check_imp_absence,
+      }
+      name2itf[key][k] = name
     end
 
-    local ancestors = {}
+    local ancestors = interface.__all_ancestors
 
-    local own_tables = {simple, meta}
-    local method_type = {'method ', 'metamethod '}
     for _, p in ipairs(parents) do
-      --region Get methods from parents
-      local p_tables = {p.__simple_methods, p.__meta_methods}
 
-      for i = 1, 2 do
-        local t, pt, typ = own_tables[i], p_tables[i], method_type[i]
+      -- Get methods from parents
+      for _, k in ipairs(keys_of_method_tables) do
+        local own = interface[k]
+        local n2i = name2itf[k]
 
-        for _, m_table in ipairs(pt) do
-          local m_name = m_table.name
-          local own_m_table = t.name2method[m_name]
+        for m_name, m_table in pairs(p[k]) do
+          local own_m_table = own[m_name]
 
           if own_m_table then
-            if own_m_table ~= m_table then
-              error(typ .. m_name .. own_m_table.signature
-                .. ' from interface ' .. repr(t.name2interface[m_name]) .. ' conflicts with '
-                .. typ .. m_name .. m_table.signature
+            if own_m_table.signature ~= m_table.signature then
+              error('method ' .. m_name .. signature_as_string(own_m_table.signature)
+                .. ' from interface ' .. repr(n2i[m_name])
+                .. ' conflicts with method ' .. m_name .. signature_as_string(m_table.signature)
                 .. ' from interface ' .. repr(p.__name),
                 3)
             end
           else
-            table.insert(t.methods, m_table)
-            t.name2method[m_name] = m_table
-            t.name2interface[m_name] = p.__name
+            own[m_name] = m_table
+            n2i[m_name] = p.__name
           end
+
         end
-
       end
-      --endregion
 
-      --region Fill set of supers
+      -- Fill set of supers
       ancestors[p] = true
       set_union(ancestors, p.__all_ancestors)
-      --endregion
-
     end
 
-    local result = setmetatable({
-      __name = name,
-      __method_check_allowed = allow_method_check and true or false,
-      __simple_methods = simple.methods,
-      __meta_methods = meta.methods,
-      __all_ancestors = ancestors,
-      __direct_ancestors = parents,
-    }, interface_meta)
-
-    known_interfaces[result] = true
-    interface_names[name] = result
-    return result
+    known_interfaces[interface] = true
+    interface_names[name] = interface
+    return setmetatable(interface, interface_meta)
   end
 
   local package_interface_meta = gen_pack_meta('Interface')
