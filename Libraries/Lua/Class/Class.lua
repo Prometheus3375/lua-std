@@ -42,16 +42,8 @@ function InitClasses()
         return ins.__class
     end
     
-    local function valuesof(ins)
-        return ins.__values
-    end
-    
     local function nameof(cls)
         return cls.__name
-    end
-    
-    local function subclassesof(cls)
-        return cls.__subs
     end
     
     
@@ -68,7 +60,7 @@ function InitClasses()
             return
         end
         
-        error('instance of type ' .. cls.__name .. ' does not have settable key \'' .. key .. '\'')
+        error('instance of type ' .. cls.__name .. ' does not have settable key \'' .. key .. '\'', 3)
     end
 
     local function index(self, cls, key)
@@ -90,7 +82,7 @@ function InitClasses()
         if value then
             return value
         end
-        error('instance of type ' .. cls.__name .. ' does not have gettable key \'' .. key .. '\'')
+        error('instance of type ' .. cls.__name .. ' does not have gettable key \'' .. key .. '\'', 3)
     end
     
     local function instance_newindex(self, key, value)
@@ -133,12 +125,12 @@ function InitClasses()
         cls = ins.__class
         if parent then
             if not cls.__supers[parent] then
-                error('class ' .. cls.__name .. ' does not have superclass ' .. parent.__name)
+                error('class ' .. cls.__name .. ' does not have superclass ' .. parent.__name, 2)
             end
         else
             parent = cls.super
             if not parent then
-                error('type ' .. cls.__name .. ' does not have a superclass')
+                error('type ' .. cls.__name .. ' does not have a superclass', 2)
             end
         end
         
@@ -146,24 +138,24 @@ function InitClasses()
     end
     
     
-    local add = {
-        field = function (class, key, description)
+    local add_indexer = {
+        field = function (cls, key, description)
             if description.public then
-                class.__public[key] = true
+                cls.__public[key] = true
             else
-                class.__readonly[key] = true
+                cls.__readonly[key] = true
             end
         end,
         
-        property = function (class, key, description)
-            class.__properties[key] = {
+        property = function (cls, key, description)
+            cls.__properties[key] = {
                 getter = description.getter,
                 setter = description.setter,
             }
         end,
         
-        meta = function (class, key, description)
-            class.__meta[key] = description.value
+        meta = function (cls, key, description)
+            cls.__meta[key] = description.value
         end,
     }
     
@@ -173,21 +165,21 @@ function InitClasses()
     
     local function property(getter, setter)
         if getter == nil and setter == nil then
-            error('property must have either a getter or a setter or both')
+            error('property must have either a getter or a setter or both', 2)
         end
         return {type = 'property', getter = getter, setter = setter}
     end
     
     local function meta(value)
         if value == nil then
-            error('meta must have a value')
+            error('meta must have a value', 2)
         end
         return {type = 'meta', value = value}
     end
     
-    
+    -- todo: add repr for strings as in python
     local function class_tostring(cls)
-        return 'Class ' .. cls.__name
+        return '<class \'' .. cls.__name .. '\'>'
     end
     
     local function new_instance(cls, ...)
@@ -202,7 +194,9 @@ function InitClasses()
     
     local subclass
     
-    local function new(name, deftable, parent)
+    -- todo: ensure all classes must have unique names
+    -- todo: protect metatables of class and instances via __metatable
+    local function create_class(name, deftable, parent)
         local class = {
             __name = name,
             __public = {},
@@ -211,7 +205,10 @@ function InitClasses()
             __meta = {
                 __newindex = instance_newindex,
                 __index = instance_index,
-                -- todo: add defult ipairs and pairs which throw an error
+                -- todo: add defult len, ipairs and pairs which throw an error
+                -- Meta fields
+                -- https://www.lua.org/manual/5.3/manual.html#2.4
+                -- http://lua-users.org/wiki/MetatableEvents
             },
             __subs = {},
         }
@@ -226,9 +223,9 @@ function InitClasses()
             if k == 'new' then
                 init = v
             elseif special_fields[k] then
-                error(' key \''..key..'\' is prohibited to use inside a class')
-            elseif type(v) == 'table' and add[v.type] then
-                add[v.type](class, k, v)
+                error(' key \''..key..'\' is prohibited to use inside a class', 3)
+            elseif type(v) == 'table' and add_indexer[v.type] then
+                add_indexer[v.type](class, k, v)
             else
                 class[k] = v
             end
@@ -262,14 +259,12 @@ function InitClasses()
     end
     
     subclass = function (parent, name, deftable)
-        return new(name, deftable, parent)
+        return create_class(name, deftable, parent)
     end
 
     local Class = {
         typeof = typeof,
-        valuesof = valuesof,
         nameof = nameof,
-        subclassesof = subclassesof,
         
         issubclass = issubclass,
         isinstance = isinstance,
@@ -283,7 +278,7 @@ function InitClasses()
     
     setmetatable(Class, {
         __call = function (self, name, deftable, parent)
-            return new(name, deftable, parent)
+            return create_class(name, deftable, parent)
         end
     })
     
