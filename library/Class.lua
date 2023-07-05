@@ -117,7 +117,7 @@ function InitClassPackage(common)
         error('class ' .. cls.__name .. ' does not have a superclass', 2)
       end
     else
-      error('second argument must be either a class or nil, got ' .. repr(parent), 2)
+      error('the second argument must be either a class or nil, got ' .. repr(parent), 2)
     end
 
     return setmetatable({__ins = ins, __cls = parent}, super_meta)
@@ -241,7 +241,7 @@ function InitClassPackage(common)
       local p = parents[i]
       if isclass(p) then
         if parent_class then
-          error('a class can have only one superclass, another superclass is passed as '
+          error('a class can have only one superclass, another superclass is passed as the '
             .. number2index(i) .. ' ancestor', 3)
         else
           parent_class = p
@@ -249,7 +249,7 @@ function InitClassPackage(common)
       elseif isinterface(p) then
         table.insert(parent_interfaces, p)
       else
-        error('all ancestors must be either classes or interfaces, '
+        error('all ancestors must be either classes or interfaces, the '
           .. number2index(i) .. ' passed ancestor is ' .. repr(p), 3)
       end
     end
@@ -464,7 +464,7 @@ function InitClassPackage(common)
       if isinterface(p) then
         table.insert(parents, p)
       else
-        error('only interfaces can be ancestors of an interface, '
+        error('only interfaces can be ancestors of an interface, the '
           .. number2index(i) .. ' passed ancestor is ' .. repr(p), 3)
       end
     end
@@ -560,7 +560,7 @@ function InitClassPackage(common)
       elseif isinterface(other) then
         table.insert(interfaces, other)
       else
-        error('all ancestors must be either classes or interfaces, '
+        error('all ancestors must be either classes or interfaces, the'
           .. number2index(i) .. ' passed ancestor is ' .. repr(other),
           3
         )
@@ -593,7 +593,7 @@ function InitClassPackage(common)
       return false
     end
 
-    error('first argument must be either a class or an interface, got ' .. repr(value), 3)
+    error('the first argument must be either a class or an interface, got ' .. repr(value), 3)
   end
 
   local function issubclass(cls, ...)
