@@ -14,7 +14,7 @@ function test_class()
     end
     
     function Animal:print()
-        print('Animal name is', self.name, ', public name is', self.public_name)
+        print('Animal name is '..self.name..', public name is '..self.public_name)
     end
 
     Animal = Class('Animal', Animal)
@@ -23,6 +23,43 @@ function test_class()
     animal:print()
     animal.public_name = 'Peter'
     animal:print()
+end
+
+function test_inheritance()
+    local Animal = {
+        name = Field(),
+        
+    }
+    function Animal:new(name)
+        local values = valuesof(self)
+        values.name = name
+    end
+    
+    function Animal:print()
+        print('Animal name is '..self.name)
+    end
+    
+    function Animal:feed()
+        print('Animal '..self.name..' feeds')
+    end
+
+    Animal = Class('Animal', Animal)
+    
+    local Mammal = {
+        children = Field(),
+    }
+    
+    function Mammal:feed()
+        super(self):feed()
+        print('Mammal '..self.name..' feeds its children')
+    end
+    
+    Mammal = Animal:subclass('Mammal', Mammal)
+    print('Superclass of '..nameof(Mammal)..' is '..nameof(Mammal.super))
+    
+    local mammal = Mammal:new('Peter')
+    mammal:print()
+    mammal:feed()
 end
 
 do
@@ -52,4 +89,5 @@ do
     Meta = Class.meta
     
     test_class()
+    test_inheritance()
 end

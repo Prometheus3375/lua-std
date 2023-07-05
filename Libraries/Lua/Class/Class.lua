@@ -197,6 +197,8 @@ function InitClasses()
         return self
     end
     
+    local subclass
+    
     local function new(name, deftable, parent)
         local class = {
             __name = name,
@@ -216,7 +218,6 @@ function InitClasses()
         }
         local supers = {}
         
-        
         for k, v in pairs(deftable) do
             if k == 'new' then
                 init = v
@@ -228,10 +229,6 @@ function InitClasses()
                 class[k] = v
             end
         end
-        
-        class.__init = init
-        class.new = new_instance
-        class.subclass = subclass
         
         if parent then
             class.super = parent
@@ -246,7 +243,15 @@ function InitClasses()
                 setmetatable(class[k], {__index = parent[k]})
             end
             meta.__index = parent
+            
+            if init == empty_func then
+                init = parent.__init
+            end
         end
+        
+        class.__init = init
+        class.new = new_instance
+        class.subclass = subclass
         class.__supers = supers
         
         setmetatable(class, meta)
@@ -255,7 +260,7 @@ function InitClasses()
         return class
     end
     
-    local function subclass(parent, name, deftable)
+    subclass = function (parent, name, deftable)
         return new(name, deftable, parent)
     end
 
