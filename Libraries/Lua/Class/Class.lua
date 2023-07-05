@@ -106,7 +106,8 @@ function InitClasses()
         local supers = table.pack(...)
         
         for i = 1, supers.n do
-            if cls.__supers[supers[i]] then
+            local other = supers[i]
+            if rawequal(cls, other) or cls.__supers[other] then
                 return true
             end
         end
