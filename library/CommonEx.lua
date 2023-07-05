@@ -17,6 +17,10 @@ function ExtendCommonPackage(common, Class, CB)
   local Reversible = CB.Reversible
   local SupportsGetNumericKey = CB.SupportsGetNumericKey
 
+  local common_ex = {}
+  --endregion
+
+  --region Local functions and objects
   local iterator_wrapper = {}
 
   function iterator_wrapper:__init(func, state, init_value)
@@ -28,16 +32,23 @@ function ExtendCommonPackage(common, Class, CB)
 
   function iterator_wrapper:__inext()
     local values = self.__values
-    local var = values.func(values.state, values.v)
+    local result = table.pack(values.func(values.state, values.v))
+    local var = result[1]
     if var ~= nil then
       values.v = var
-      return var
+      return table.unpack(result, 1, result.n)
     end
 
     return nil
   end
 
   iterator_wrapper = Class('IteratorWrapper', iterator_wrapper, Iterator)
+
+  local function is_sequence(v)
+    if type(v) ~= 'table' then return false end
+    local k = next(v)
+    return k == nil or type(k) == 'number' or isinstance(v, SupportsGetNumericKey)
+  end
 
   local sequence_iterator = {}
 
@@ -58,7 +69,7 @@ function ExtendCommonPackage(common, Class, CB)
     return nil
   end
 
-  sequence_iterator = Class('CommonEx.SequenceIterator', sequence_iterator, Iterator)
+  sequence_iterator = Class('SequenceIterator', sequence_iterator, Iterator)
 
   local function type_error(ins, err, level)
     level = (level or 1) + 1
@@ -69,33 +80,27 @@ function ExtendCommonPackage(common, Class, CB)
   end
 
   local function iter(ins, err_level)
-    if type(ins) == 'table' then
-      if isinstance(ins, Iterable) then
-        local f, s, v = ins:__iter()
+    if isinstance(ins, Iterable) then
+      local f, s, v = ins:__iter()
 
-        if isinstance(f, Iterator) then
-          return f
-        end
-
-        if type(f) == 'function' then
-          return iterator_wrapper(f, s, v)
-        else
-          error('first return value of __iter method must be an iterator instance or function, '
-            .. ins.__class.__name .. '.__iter() returned ' .. type_repr(f), (err_level or 1) + 1)
-        end
+      if isinstance(f, Iterator) then
+        return f
       end
 
-      local k, _ = next(ins)
-      if k == nil or type(k) == 'number' or isinstance(ins, SupportsGetNumericKey) then
-        return sequence_iterator(ins)
+      if type(f) == 'function' then
+        return iterator_wrapper(f, s, v)
+      else
+        error('first return value of __iter method must be an iterator instance or function, '
+          .. ins.__class.__name .. '.__iter() returned ' .. type_repr(f), (err_level or 1) + 1)
       end
+    end
 
+    if is_sequence(ins) then
+      return sequence_iterator(ins)
     end
 
     type_error(ins, 'is not an iterable', (err_level or 1) + 1)
   end
-
-  local common_ex = {iter = iter, IteratorWrapper = iterator_wrapper}
   --endregion
 
   --region CB extension
@@ -113,8 +118,7 @@ function ExtendCommonPackage(common, Class, CB)
       return result
     end
 
-    local k, _ = next(ins)
-    if k == nil or type(k) == 'number' or isinstance(ins, SupportsGetNumericKey) then
+    if is_sequence(ins) then
       return ins
     end
 
@@ -136,6 +140,8 @@ function ExtendCommonPackage(common, Class, CB)
 
     type_error(ins, 'is not an iterator', 2)
   end
+
+  common_ex.iter = iter
 
   function common_ex.reverse(ins)
     if isinstance(ins, Reversible) then
@@ -168,9 +174,11 @@ function ExtendCommonPackage(common, Class, CB)
     return sum
   end
 
-  function common_ex.callable(v)
+  function common_ex.is_callable(v)
     return type(v) == 'function' or isclass(v) or isinstance(v, Callable)
   end
+
+  common_ex.is_sequence = is_sequence
 
   --region enumerate
   local enumerate = {}
@@ -232,6 +240,8 @@ function ExtendCommonPackage(common, Class, CB)
   common_ex.filter = Class('filter', filter, Iterator)
   --endregion
 
+  common_ex.IteratorWrapper = iterator_wrapper
+
   --region map
   local map = {}
   function map:__init(map_func, ...)
@@ -265,6 +275,8 @@ function ExtendCommonPackage(common, Class, CB)
 
   common_ex.map = Class('map', map, Iterator)
   --endregion
+
+  common_ex.SequenceIterator = sequence_iterator
 
   --region zip
   local zip = {}
