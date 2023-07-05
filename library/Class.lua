@@ -45,6 +45,9 @@ function InitClassPackage(common)
   --endregion
 
   --region Class variables
+  -- todo add __id to class, instance and interface
+  -- represents table address
+
   local known_indexers = setmetatable({}, __meta_weak_keys)
   local function is_indexer(v) return known_indexers[v] or false end
 
@@ -301,7 +304,7 @@ function InitClassPackage(common)
     '__properties',
   }
 
-  local prohibited_keys = common.array2set({
+  local prohibited_keys = common.set.from_array({
     -- instance keys
     '__class',
     '__values',
@@ -396,6 +399,7 @@ function InitClassPackage(common)
       -- own instances
       __init = empty_function,
       __meta = {
+        __name = name .. ' instance',
         __len = instance_len,
         __index = instance_index,
         __newindex = instance_newindex,
@@ -403,6 +407,7 @@ function InitClassPackage(common)
         __metatable = true,
       },
     }
+    -- todo make global
     local cls_meta = {
       __len = class_len,
       __newindex = class_newindex,
@@ -440,6 +445,7 @@ function InitClassPackage(common)
       set_union(class.__superclasses, parent_class.__superclasses)
       set_union(class_interfaces, parent_class.__interfaces)
 
+      -- todo copy missing values instead of adding __index
       for _, indexer in ipairs(class_indexers) do
         setmetatable(class[indexer], parent_class.__sub_metas[indexer])
       end
@@ -460,6 +466,11 @@ function InitClassPackage(common)
         ins_meta[metaname] = nil
       end
     end
+
+    -- todo add hash check
+    -- if class does not have __meta.__eq and __hash, add basic hash based on address
+    -- if class has __meta.__eq and __hash is None, set __hash to nil?
+    -- do nothing if class has __meta.__eq and not __hash, has __hash and not __meta.__eq or has both.
 
     known_classes[class] = true
     class_names[name] = class
@@ -614,6 +625,7 @@ function InitClassPackage(common)
 
   local Class_meta = Class.meta
 
+  -- todo pass class?
   function interface_prepare_class_deftable(self, class_deftable, class_parent)
     class_parent = class_parent or {__meta = {}}
 
@@ -709,7 +721,7 @@ function InitClassPackage(common)
     }
 
     for k, m_table in pairs(method_table) do
-      local key = m_table.is_metamethod and '__metamethods' or '__usual_methods'
+      local key = m_table.is_meta and '__metamethods' or '__usual_methods'
       interface[key][k] = {
         signature = define_signature(m_table.args),
         default = m_table.default,
