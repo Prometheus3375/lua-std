@@ -117,7 +117,7 @@ function InitClassPackage(common)
     if not rawequal(value, nil) then
       return value
     end
-    error('instance of type ' .. cls.__name .. ' does not have gettable key ' .. repr(key), 3)
+    error(repr(cls.__name) .. ' instance does not have gettable key ' .. repr(key), 3)
   end
 
   local function newindex(self, cls, key, value)
@@ -133,7 +133,7 @@ function InitClassPackage(common)
       return
     end
 
-    error('instance of type ' .. cls.__name .. ' does not have settable key ' .. repr(key), 3)
+    error(repr(cls.__name) .. ' instance does not have settable key ' .. repr(key), 3)
   end
 
   local function class_len() error('classes do not support length operator', 2) end
@@ -159,7 +159,7 @@ function InitClassPackage(common)
   end
 
   local function instance_len(self)
-    error(self.__class.__name .. ' instances do not support length operator', 2)
+    error(repr(self.__class.__name) .. ' instance does not support length operator', 2)
   end
 
   local function instance_newindex(self, key, value)
@@ -171,11 +171,11 @@ function InitClassPackage(common)
   end
 
   local function instance_ipairs(self)
-    error(self.__class.__name .. ' instances do not support ipairs()', 2)
+    error(repr(self.__class.__name) .. ' instance does not support ipairs()', 2)
   end
 
   local function instance_pairs(self)
-    error(self.__class.__name .. ' instances do not support pairs()', 2)
+    error(repr(self.__class.__name) .. ' instance does not support pairs()', 2)
   end
 
   local super_meta = {__metatable = true}
@@ -186,7 +186,7 @@ function InitClassPackage(common)
   function super_meta:__len()
     local len = self.__cls.__meta.__len
     if len == instance_len then
-      error(self.__cls.__name .. ' instances do not support length operator', 2)
+      error(repr(self.__cls.__name) .. ' instance does not support length operator', 2)
     end
 
     return len(self.__ins)
@@ -203,7 +203,7 @@ function InitClassPackage(common)
   function super_meta:__ipairs()
     local ipairs = self.__cls.__meta.__ipairs
     if ipairs == instance_ipairs then
-      error(self.__cls.__name .. ' instances do not support ipairs()', 2)
+      error(repr(self.__cls.__name) .. ' instance does not support ipairs()', 2)
     end
 
     return ipairs(self.__ins)
@@ -212,7 +212,7 @@ function InitClassPackage(common)
   function super_meta:__pairs()
     local pairs = self.__cls.__meta.__pairs
     if pairs == instance_pairs then
-      error(self.__cls.__name .. ' instances do not support pairs()', 2)
+      error(repr(self.__cls.__name) .. ' instance does not support pairs()', 2)
     end
 
     return pairs(self.__ins)
@@ -479,11 +479,11 @@ function InitClassPackage(common)
         if m_table.default then
           class_deftable[m_name] = m_table.default
         else
-          error('any descendant of ' .. self.__name .. ' must implement '
+          error('any descendant of interface ' .. repr(self.__name) .. ' must implement '
             .. m_name .. m_table.signature, 4)
         end
       elseif type(method) ~= 'function' then
-        error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
+        error('any descendant of interface ' .. repr(self.__name) .. ' must have ' .. m_name ..
           ' as a function with signature ' .. m_table.signature, 4)
       end
     end
@@ -503,11 +503,11 @@ function InitClassPackage(common)
         if m_table.default then
           class_deftable[m_name] = Class_meta(m_table.default)
         else
-          error('any descendant of ' .. self.__name .. ' must implement metamethod '
+          error('any descendant of interface ' .. repr(self.__name) .. ' must implement metamethod '
             .. m_name .. m_table.signature, 4)
         end
       elseif type(method) ~= 'function' then
-        error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
+        error('any descendant of interface ' .. repr(self.__name) .. ' must have ' .. m_name ..
           ' as a metamethod with signature ' .. m_table.signature, 4)
       end
     end
@@ -566,8 +566,8 @@ function InitClassPackage(common)
 
           if own_m_table then
             if own_m_table ~= m_table then
-              error(tostring(own_m_table) .. ' from ' .. t.name2interface[m_name]
-                .. ' conflicts with ' .. tostring(m_table) .. ' from ' .. p.__name, 3)
+              error(tostring(own_m_table) .. ' from interface ' .. repr(t.name2interface[m_name])
+                .. ' conflicts with ' .. tostring(m_table) .. ' from interface ' .. repr(p.__name), 3)
             end
           else
             table.insert(t.methods, m_table)

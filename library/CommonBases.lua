@@ -5,6 +5,7 @@ function InitCommonBases(common, Interface)
 
   local CB = {}
 
+  local repr = common.repr
   local isclass = common.isclass
   local isinterface = common.isinterface
   local isinstance = common.isinstance
@@ -118,7 +119,7 @@ function InitCommonBases(common, Interface)
   -- todo remove err_level from all functions
   -- todo inline not_of_type
   local function not_of_type(ins, typ, level)
-    error('instance of type ' .. ins.__class.__name .. ' is not ' .. typ, level + 1)
+    error(repr(ins.__class.__name) .. ' instance is not ' .. typ, level + 1)
   end
 
   local common_ex = {}
@@ -174,7 +175,7 @@ function InitCommonBases(common, Interface)
       return result
     end
 
-    error('instance of type ' .. ins.__class.__name .. ' cannot be represented as array', 2)
+    error(repr(ins.__class.__name) .. ' instance cannot be represented as array', 2)
   end
 
   for name, value in pairs(common_ex) do
