@@ -1,9 +1,18 @@
-function InitDeque()
+function InitDeque(common, Class, Interface, CB)
+  --region Initialization
+  common = common or _ENV.common or _ENV.Common
+  Class = Class or _ENV.Class
+  Interface = Interface or _ENV.Interface
+  CB = CB or _ENV.CB or _ENV.CommonBases
+
+  local repr = common.repr
+  --endregion
 
   local function init_node(self, value)
     self.__values.value = value
   end
 
+  -- todo rename prior to left, subsq to right
   local function node_Pop(self)
     -- removes connections of self
     local values = self.__values
@@ -46,7 +55,7 @@ function InitDeque()
   end
 
   local function node_tostring(self)
-    return self.__name .. '(' .. self.value .. ')'
+    return self.__name .. '(' .. repr(self.value) .. ')'
   end
 
   local DequeNode = Class('DequeNode', {
@@ -63,7 +72,7 @@ function InitDeque()
     __tostring = Class.meta(node_tostring),
   })
 
-  -- todo: create iterator object
+  -- todo create iterator object
 
   local list_AppendNode
 
@@ -107,12 +116,13 @@ function InitDeque()
     values.length = values.length + 1
   end
 
+  -- todo remove err_level argument
   local function list_PopNode(self, node, err_level)
     local values = self.__values
     local length = values.length
 
     if length == 0 then
-      error('pop from empty ' .. self.__name, err_level or 2)
+      error('pop from an empty ' .. self.__name, err_level or 2)
     end
 
     local first = values.first
@@ -222,7 +232,7 @@ function InitDeque()
   end
 
   -- https://docs.python.org/3/library/collections.html#collections.deque
-  -- todo: add len, concat https://www.lua.org/manual/5.3/manual.html#2.4
+  -- todo add len, concat https://www.lua.org/manual/5.3/manual.html#2.4
   local Deque = Class('Deque', {
     -- fields
     first = Class.field(false),
