@@ -17,10 +17,11 @@ function ExtendCommonPackage(common, Class, CB)
   local Reversible = CB.Reversible
 
   local function type_error(ins, err, level)
+    level = (level or 1) + 1
     if isinstance(ins) then
-      error(repr(ins.__class.__name) .. ' instance ' .. err, level + 1)
+      error(repr(ins.__class.__name) .. ' instance ' .. err, level)
     end
-    error(type_repr(ins) .. err, level + 1)
+    error(type_repr(ins) .. err, level)
   end
 
   local function iter(ins, err_level)
@@ -30,10 +31,10 @@ function ExtendCommonPackage(common, Class, CB)
     -- todo add support for SupportsItemGet
     -- todo add support for arrays
 
-    type_error(ins, 'is not an iterable', err_level + 1)
+    type_error(ins, 'is not an iterable', (err_level or 1) + 1)
   end
 
-  local common_ex = {}
+  local common_ex = {iter = iter}
   --endregion
 
   --region CB extension
@@ -71,14 +72,6 @@ function ExtendCommonPackage(common, Class, CB)
     end
 
     type_error(ins, 'is not an iterator', 2)
-  end
-
-  function common_ex.iter(ins)
-    if isinstance(ins, Iterable) then
-      return ins:__iter()
-    end
-
-    type_error(ins, 'is not an iterable', 2)
   end
 
   function common_ex.reverse(ins)
