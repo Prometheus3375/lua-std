@@ -5,7 +5,7 @@ do
   local repr = common.repr
   local type_repr = common.type_repr
   local number2index = common.number2index
-  local table_address = PLSL.table.address
+  local table_address = PLSL.common.get_address
   local string_split = PLSL.string.split
   local set2array = PLSL.set.to_array
   local array2set = PLSL.set.from_array
@@ -659,7 +659,7 @@ do
 
       if m_table.does_not_implement(method) then
         if m_table.default then
-          cls[m_name] = m_table.default
+          cls.__meta[m_name] = m_table.default
         else
           error('any descendant of interface ' .. repr(self.__name) .. ' must implement metamethod '
             .. m_name .. signature_as_string(m_table.signature), 4)
