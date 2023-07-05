@@ -9,6 +9,7 @@ function InitClassPackage(common)
   local set2array = common.set.to_array
   local set_union = common.set.union
   local isNone = common.isNone
+  local toNil = common.toNil
   local gen_meta = common.generate_protected_metatable
   local gen_pack_meta = common.generate_package_metatable
 
@@ -517,6 +518,7 @@ function InitClassPackage(common)
 
     args = string.gsub(args, '%s*,%s*', ',')
     args = string_split(args, ',')
+    local set_args = {}
 
     for i, arg in ipairs(args) do
       if type(arg) ~= 'string' then
@@ -529,7 +531,12 @@ function InitClassPackage(common)
       elseif not string.match(arg, argument_name_pattern) then
         error('argument name must start with a letter or an underscore and '
           .. 'may contain letters, digits and underscores, got ' .. repr(arg), 2)
+      elseif set_args[arg] then
+        error('argument name must be unique, name ' .. repr(arg) .. ' used on positions '
+          .. set_args[arg] .. ' and ' .. i, 2)
       end
+
+      set_args[arg] = i
     end
 
     if default ~= nil and type(default) ~= 'function' then
@@ -630,7 +637,7 @@ function InitClassPackage(common)
       if meta_field == nil then
         method = class_parent.__meta[m_name]
       else
-        method = meta_field.value
+        method = toNil(meta_field.value)
       end
 
       if m_table.does_not_implement(method) then

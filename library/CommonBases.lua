@@ -4,7 +4,6 @@ function InitCommonBases(common, Class, Interface)
   Class = Class or _ENV.Class
   Interface = Interface or _ENV.Interface
 
-  local isNoneOrNil = common.isNoneOrNil
   local Method = Interface.Method
 
   local CB = {}
@@ -33,8 +32,7 @@ function InitCommonBases(common, Class, Interface)
   local default_len = Class('temp1', {}).__meta.__len
 
   local function sized_check_imp_absence(func)
-    -- None for checks in Class.meta
-    return func == default_len or (type(func) ~= 'function' and not isNoneOrNil(func))
+    return func == default_len or (func ~= nil and type(func) ~= 'function')
   end
 
   CB.Sized = Interface('Sized', true, {__len = Method('self', true, nil, sized_check_imp_absence)})
