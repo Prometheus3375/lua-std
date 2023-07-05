@@ -15,8 +15,14 @@ function InitCommonPackage()
 
   local repr = common.repr
 
-  function common.type_repr(v, sep)
-    return type(v) .. (sep or ' ') .. repr(v)
+  function common.type_repr(v)
+    local t = type(v)
+    v = repr(v)
+
+    if string.match(v, '^' .. t) then
+      return v
+    end
+    return t .. ' ' .. v
   end
 
   function common.rawlen(t)
