@@ -179,15 +179,17 @@ do
 
   function __math.round(x)
     local n, f = math.modf(x)
-    if f == 0.5 or f == -0.5 then
+    local sign = f > 0 and 1 or (f < 0 and -1 or 0)
+
+    if sign == 0 then return n end
+
+    if f * sign == 0.5 then
       if n % 2 == 0 then return n end
-      return n + 1
-    elseif f == -0.5 then
-      if n % 2 == 0 then return n end
-      return n - 1
-    else
-      return math.floor(x + 0.5)
+
+      return n + sign
     end
+
+    return math.floor(x + 0.5)
   end
 
   PLSL.math = setmetatable(__math, gen_module_meta('PLSL.math'))
