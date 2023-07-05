@@ -93,6 +93,16 @@ do
     return enum_next, raw and {next, t, nil} or {pairs(t)}, (start or 1) - 1
   end
 
+  function common.get_address(v)
+    local str = tostring(v)
+    local _, end_ = string.find(str, ': ', 1, true)
+    local after_colon = string.sub(str, end_ + 1)
+    if string.sub(after_colon, 1, 2) == '0x' then
+      after_colon = string.sub(after_colon, 3)
+    end
+    return tonumber(after_colon, 16)
+  end
+
   function common.generate_protected_metatable(name, plural)
     local name_do = name .. (plural and ' do not ' or ' does not ')
     return {
@@ -129,63 +139,35 @@ do
     end
   end
 
-  --region table
-  local __table = {}
-
-  function __table:length()
-    local n = 0
-    for _, _ in next, self, nil do
-      n = n + 1
-    end
-    return n
-  end
-
-  function __table:is_empty()
-    return next(self) == nil
-  end
-
-  function __table:address()
-    local after_colon = string.sub(tostring(self), 8)
-    if string.sub(after_colon, 1, 2) == '0x' then
-      after_colon = string.sub(after_colon, 3)
-    end
-    return tonumber(after_colon, 16)
-  end
-
-  local table_address = __table.address
-
-  PLSL.table = setmetatable(__table, gen_pack_meta('PLSL.table'))
-  --endregion
-
   --region None
   local none_metatable = generate_protected_metatable('None', false)
   function none_metatable.__tostring() return 'None' end
   local None = {}
-  None.__id = table_address(None)
+  None.__id = common.get_address(None)
   setmetatable(None, none_metatable)
 
   common.None = None
 
-  function common.isNone(ins)
-    return rawequal(ins, None)
+  function common.isNone(v)
+    return rawequal(v, None)
   end
 
-  function common.isNoneOrNil(ins)
-    return rawequal(ins, None) or ins == nil
+  function common.isNoneOrNil(v)
+    return rawequal(v, None) or v == nil
   end
 
-  function common.toNil(ins)
-    if rawequal(ins, None) then
+  function common.toNil(v)
+    if rawequal(v, None) then
       return nil
     end
-    return ins
+    return v
   end
 
-  function common.toNone(ins)
-    if ins == nil then
+  function common.toNone(v)
+    if v == nil then
       return None
     end
-    return ins
+    return v
   end
   --endregion
 
@@ -280,6 +262,24 @@ do
   end
 
   PLSL.string = setmetatable(__string, gen_pack_meta('common.string'))
+  --endregion
+
+  --region table
+  local __table = {}
+
+  function __table:length()
+    local n = 0
+    for _, _ in next, self, nil do
+      n = n + 1
+    end
+    return n
+  end
+
+  function __table:is_empty()
+    return next(self) == nil
+  end
+
+  PLSL.table = setmetatable(__table, gen_pack_meta('PLSL.table'))
   --endregion
 
   -- todo add defaults
