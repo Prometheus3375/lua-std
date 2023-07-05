@@ -6,7 +6,12 @@
       <w>inext</w>
       <w>isinterface</w>
       <w>issubclass</w>
+      <w>maxsplit</w>
       <w>metamethod</w>
+      <w>metamethods</w>
+      <w>rawipairs</w>
+      <w>rawlen</w>
+      <w>rawpairs</w>
     </words>
   </dictionary>
 </component>

@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Class" type="lua.app" factoryName="Lua Application" folderName="tests">
+    <option name="program" value="lua53" />
+    <option name="file" value="tests/Class.lua" />
+    <option name="workingDir" value="$PROJECT_DIR$" />
+    <option name="debuggerType" value="2" />
+    <option name="params" value="" />
+    <option name="charset" value="UTF-8" />
+    <option name="showConsole" value="true" />
+    <method v="2" />
+  </configuration>
+</component>
