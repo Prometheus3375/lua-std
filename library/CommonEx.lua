@@ -16,12 +16,19 @@ function ExtendCommonPackage(common, Class, CB)
   local Iterator = CB.Iterator
   local Reversible = CB.Reversible
 
+  local function type_error(ins, err, level)
+    if isinstance(ins) then
+      error(repr(ins.__class.__name) .. ' instance ' .. err, level + 1)
+    end
+    error(type_repr(ins) .. err, level + 1)
+  end
+
   local function iter(ins, err_level)
     if isinstance(ins, Iterable) then
       return ins:__iter()
     end
 
-    error(repr(ins.__class.__name) .. ' instance is not an iterable', err_level + 1)
+    type_error(ins, 'is not an iterable', err_level + 1)
   end
 
   local common_ex = {}
@@ -42,7 +49,7 @@ function ExtendCommonPackage(common, Class, CB)
       return result
     end
 
-    error(repr(ins.__class.__name) .. ' instance cannot be represented as an array', 2)
+    type_error(ins, 'cannot be represented as an array', 2)
   end
 
   function common_ex.contains(ins, value)
@@ -50,7 +57,7 @@ function ExtendCommonPackage(common, Class, CB)
       return ins:__contains(value)
     end
 
-    error(repr(ins.__class.__name) .. ' instance is not a container', 2)
+    type_error(ins, 'is not a container', 2)
   end
 
   function common_ex.inext(ins)
@@ -58,7 +65,7 @@ function ExtendCommonPackage(common, Class, CB)
       return ins:__inext()
     end
 
-    error(repr(ins.__class.__name) .. ' instance is not an iterator', 2)
+    type_error(ins, 'is not an iterator', 2)
   end
 
   function common_ex.iter(ins)
@@ -66,7 +73,7 @@ function ExtendCommonPackage(common, Class, CB)
       return ins:__iter()
     end
 
-    error(repr(ins.__class.__name) .. ' instance is not an iterable', 2)
+    type_error(ins, 'is not an iterable', 2)
   end
 
   function common_ex.reverse(ins)
@@ -74,7 +81,7 @@ function ExtendCommonPackage(common, Class, CB)
       return ins:__reverse()
     end
 
-    error(repr(ins.__class.__name) .. ' instance is not reversible', 2)
+    type_error(ins, 'is not reversible', 2)
   end
   --endregion
 
