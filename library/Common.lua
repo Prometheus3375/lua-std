@@ -1,4 +1,4 @@
-function InitCommon()
+function InitCommonPackage()
   local common = {}
 
   function common.repr(v)
