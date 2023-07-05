@@ -256,11 +256,8 @@ function InitClassPackage(common)
     end
     --endregion
 
-    if parent_class then
-      setmetatable(deftable, {__index = parent_class})
-    end
     for _, itf in ipairs(parent_interfaces) do
-      itf:PrepareClassDeftable(deftable)
+      itf:PrepareClassDeftable(deftable, parent_class)
     end
 
     local class = {
@@ -348,15 +345,12 @@ function InitClassPackage(common)
     return 'interface method ' .. self.name .. self.signature
   end
 
-  function method_meta.__eq(self, other)
-    return self.name == other.name and self.signature == other.signature and self.default == other.default
-  end
-
   function method_meta.__index:WithDefault(default)
     if rawequal(default, nil) or type(default) == 'function' then
       return setmetatable({
         name = self.name,
         signature = self.signature,
+        is_metamethod = self.is_metamethod,
         default = default,
       }, method_meta)
     end
@@ -364,8 +358,12 @@ function InitClassPackage(common)
     error('default must be a function or nil, got ' .. repr(default), 2)
   end
 
-  function Interface.DefineMethod(name, signature)
-    return setmetatable({name = name, signature = signature}, method_meta)
+  function Interface.DefineMethod(name, signature, is_metamethod)
+    return setmetatable({
+      name = name,
+      signature = signature,
+      is_metamethod = is_metamethod or false,
+    }, method_meta)
   end
 
   local interface_meta = gen_meta('interfaces', true)
@@ -387,28 +385,52 @@ function InitClassPackage(common)
     return self.__registered[cls] or false
   end
 
-  function interface_meta.__index:PrepareClassDeftable(class_deftable)
+  function interface_meta.__index:PrepareClassDeftable(class_deftable, class_parent)
+    class_parent = class_parent or {__meta = {}}
+
     for _, m_table in ipairs(self.__methods) do
       local m_name = m_table.name
-      local method = class_deftable[m_name]
+      if m_table.is_metamethod then
+        local meta_field = class_deftable[m_name]
+        local method
 
-      if rawequal(method, nil) then
-        if m_table.default then
-          class_deftable[m_name] = m_table.default
+        if rawequal(meta_field, nil) then
+          method = class_parent.__meta[m_name]
         else
-          error('any ' .. self.__name .. ' must implement ' .. m_name .. m_table.signature, 2)
+          method = meta_field.value
         end
-      elseif type(method) ~= 'function' then
-        error(
-          'any ' .. self.__name .. ' must have ' .. m_name .. ' as a function with signature '
-            .. m_table.signature,
-          2
-        )
+
+        if rawequal(method, nil) then
+          if m_table.default then
+            class_deftable[m_name] = Class.meta(m_table.default)
+          else
+            error('any descendant of ' .. self.__name .. ' must implement metamethod '
+              .. m_name .. m_table.signature, 2)
+          end
+        elseif type(method) ~= 'function' then
+          error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
+            ' as a metamethod with signature ' .. m_table.signature, 2)
+        end
+      else
+        local method = class_deftable[m_name] or class_parent[m_name]
+
+        if rawequal(method, nil) then
+          if m_table.default then
+            class_deftable[m_name] = m_table.default
+          else
+            error('any descendant of ' .. self.__name .. ' must implement '
+              .. m_name .. m_table.signature, 2)
+          end
+        elseif type(method) ~= 'function' then
+          error('any descendant of ' .. self.__name .. ' must have ' .. m_name ..
+            ' as a function with signature ' .. m_table.signature, 2)
+        end
+
       end
     end
 
     for _, p in ipairs(self.__all_supers_array) do
-      p:PrepareClassDeftable(class_deftable)
+      p:PrepareClassDeftable(class_deftable, class_parent)
     end
   end
 
